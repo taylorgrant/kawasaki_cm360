@@ -3,7 +3,7 @@
 cm360_workflow <- function() {
 
   # read in Amazon launch data 
-  amzn <- readr::read_csv("/home/rstudio/R/kawasaki/data/amazon_launch.csv")
+  amzn <- readr::read_csv("/home/rstudio/R/kawasaki_cm360/data/amazon_launch.csv")
   amzn_dates <- unique(amzn$date) # dates 
   cat("---------------------  Data pulled on:", as.character(Sys.Date()), "------------------------ \n")
   
@@ -23,11 +23,11 @@ cm360_workflow <- function() {
   # py_config()
   
   # going to call single Python script and reauth 
-  source_python("/home/rstudio/R/kawasaki/py_scripts/cm360_entrypoint.py")
-  source_python("/home/rstudio/R/kawasaki/py_scripts/gcp_reauth.py")
-  source("/home/rstudio/R/kawasaki/R/helpers/get_utms.R")
-  source("/home/rstudio/R/kawasaki/R/helpers/merge_meta.R")
-  source("/home/rstudio/R/kawasaki/R/helpers/merge_nextdoor.R")
+  source_python("/home/rstudio/R/kawasaki_cm360/py_scripts/cm360_entrypoint.py")
+  source_python("/home/rstudio/R/kawasaki_cm360/py_scripts/gcp_reauth.py")
+  source("/home/rstudio/R/kawasaki_cm360/R/helpers/get_utms.R")
+  source("/home/rstudio/R/kawasaki_cm360/R/helpers/merge_meta.R")
+  source("/home/rstudio/R/kawasaki_cm360/R/helpers/merge_nextdoor.R")
   
   # reauthorize the token here
   credentials <- gcp_reauth()

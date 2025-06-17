@@ -5,7 +5,7 @@ get_kawi_pv <- function(){
   cat("---------------- GA4 data pulled on:", as.character(Sys.Date()), "-------------------- \n")
   
   pacman::p_load(tidyverse, janitor, here, glue, googlesheets4, googledrive, googleAnalyticsR)
-  source("/home/rstudio/R/kawasaki/R/helpers/get_utms.R")
+  source("/home/rstudio/R/kawasaki_cm360/R/helpers/get_utms.R")
   
   # AUTHENTICATE ------------------------------------------------------------
   options(gargle_oauth_cache = ".secrets",
@@ -14,6 +14,9 @@ get_kawi_pv <- function(){
           # gargle_verbosity = "debug"
   )
   drive_auth()
+  
+  readRenviron("/home/rstudio/R/kawasaki_cm360/.Renviron")
+  ga_auth(json_file = Sys.getenv("GA_AUTH_FILE"))
   my_property_id <- 249558280
   
 

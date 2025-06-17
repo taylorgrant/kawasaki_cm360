@@ -2,7 +2,7 @@
 cm360_update <- function() {
   
   # read in Amazon launch data 
-  amzn <- readr::read_csv("/home/rstudio/R/kawasaki/data/amazon_launch.csv")
+  amzn <- readr::read_csv("/home/rstudio/R/kawasaki_cm360/data/amazon_launch.csv")
   amzn_dates <- unique(amzn$date) # dates 
   cat("---------------------  Data updated on:", format(Sys.time(), tz = "America/Los_Angeles"), "------------------------ \n")
   
@@ -24,10 +24,10 @@ cm360_update <- function() {
   # going to call single Python script and reauth 
   # source_python("/home/rstudio/R/kawasaki/py_scripts/cm360_entrypoint.py")
   # source_python("/home/rstudio/R/kawasaki/py_scripts/gcp_reauth.py")
-  source("/home/rstudio/R/kawasaki/R/helpers/get_utms.R")
-  source("/home/rstudio/R/kawasaki/R/helpers/merge_meta.R")
-  source("/home/rstudio/R/kawasaki/R/helpers/merge_nextdoor.R")
-  source("/home/rstudio/R/kawasaki/R/helpers/merge_search.R")
+  source("/home/rstudio/R/kawasaki_cm360/R/helpers/get_utms.R")
+  source("/home/rstudio/R/kawasaki_cm360/R/helpers/merge_meta.R")
+  source("/home/rstudio/R/kawasaki_cm360/R/helpers/merge_nextdoor.R")
+  source("/home/rstudio/R/kawasaki_cm360/R/helpers/merge_search.R")
   
   # reauthorize the token here
   # credentials <- gcp_reauth()
@@ -134,7 +134,7 @@ cm360_update <- function() {
   
 
   # EQUILIBRIUM MODEL (ECM) -------------------------------------------------
-  events <- readr::read_csv("/home/rstudio/R/kawasaki/data/NAV_events_list_daily.csv") |> 
+  events <- readr::read_csv("/home/rstudio/R/kawasaki_cm360/data/NAV_events_list_daily.csv") |> 
     janitor::clean_names() |> 
     select(date = dates, event) |> 
     mutate(date = lubridate::mdy(date))
@@ -156,7 +156,7 @@ cm360_update <- function() {
     data = channel_dat,
     lags = list("pv" = 1, "CTV" = 1, "OLV" = 1, 
                 "Social" = 1, Digital = 1, event = 1),
-    diffs = c("CTV", "OLV", "Social", "Digital", "Search", "event"),
+    diffs = c("CTV", "OLV", "Social", "Digital", "event"),
     ec = TRUE, simulate = FALSE)
   
   print(broom::tidy(summary(res)))
