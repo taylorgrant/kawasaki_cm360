@@ -28,6 +28,8 @@ cm360_workflow <- function() {
   source("/home/rstudio/R/kawasaki_cm360/R/helpers/get_utms.R")
   source("/home/rstudio/R/kawasaki_cm360/R/helpers/merge_meta.R")
   source("/home/rstudio/R/kawasaki_cm360/R/helpers/merge_nextdoor.R")
+  source("/home/rstudio/R/kawasaki_cm360/R/helpers/merge_search.R")
+  source("/home/rstudio/R/kawasaki_cm360/R/helpers/merge_disney.R")
   
   # reauthorize the token here
   credentials <- gcp_reauth()
@@ -45,7 +47,9 @@ cm360_workflow <- function() {
     mutate(across("Media Cost":"Video Completions", as.numeric)) |> 
     janitor::clean_names() |> 
     filter(str_detect(campaign, "Sustain")) |> # make sure all data is from sustain campaign now
-    filter(!impressions == 0 & !media_cost == 0)
+    filter(!impressions == 0 
+           #& !media_cost == 0
+           )
   
   # GET FULL PERFORMANCE ----------------------------------------------------
   performance_df <- read_sheet(ss = "1dc-SL4KNa9v89CE4lGxR1ZAdoyW1SbepHzKFf7I9__k",
@@ -60,6 +64,10 @@ cm360_workflow <- function() {
     mutate(partner = trimws(partner))
   
   clean_media <- merge_nextdoor(clean_media)
+  
+  clean_media <- merge_search(clean_media)
+  
+  clean_media <- merge_disney(clean_media)
   
   # get spend thresholds and flight dates out of the UTM data
   thresholds <- select(launch_utms, c(partner = source, type = medium, threshold = planned_budget,
