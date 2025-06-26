@@ -4,6 +4,7 @@ cm360_update <- function() {
   # read in Amazon launch data 
   amzn <- readr::read_csv("/home/rstudio/R/kawasaki_cm360/data/amazon_launch.csv")
   amzn_dates <- unique(amzn$date) # dates 
+  
   cat("---------------------  Data updated on:", format(Sys.time(), tz = "America/Los_Angeles"), "------------------------ \n")
   
   # SET UP ------------------------------------------------------------------
@@ -28,6 +29,7 @@ cm360_update <- function() {
   source("/home/rstudio/R/kawasaki_cm360/R/helpers/merge_meta.R")
   source("/home/rstudio/R/kawasaki_cm360/R/helpers/merge_nextdoor.R")
   source("/home/rstudio/R/kawasaki_cm360/R/helpers/merge_search.R")
+  source("/home/rstudio/R/kawasaki_cm360/R/helpers/merge_disney.R")
   
   # reauthorize the token here
   # credentials <- gcp_reauth()
@@ -63,6 +65,8 @@ cm360_update <- function() {
   clean_media <- merge_nextdoor(clean_media)
   
   clean_media <- merge_search(clean_media)
+  
+  clean_media <- merge_disney(clean_media)
   
   # get spend thresholds and flight dates out of the UTM data
   thresholds <- select(launch_utms, c(partner = source, type = medium, threshold = planned_budget,
@@ -152,11 +156,11 @@ cm360_update <- function() {
   
   # channel model 
   res <- dynardl(
-    pv ~ CTV + OLV + Social + Digital + event, 
+    pv ~ CTV + OLV + Social + Digital, 
     data = channel_dat,
     lags = list("pv" = 1, "CTV" = 1, "OLV" = 1, 
-                "Social" = 1, Digital = 1, event = 1),
-    diffs = c("CTV", "OLV", "Social", "Digital", "event"),
+                "Social" = 1, Digital = 1),
+    diffs = c("CTV", "OLV", "Social", "Digital"),
     ec = TRUE, simulate = FALSE)
   
   print(broom::tidy(summary(res)))
