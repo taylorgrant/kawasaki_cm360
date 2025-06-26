@@ -46,7 +46,8 @@ get_kawi_pv <- function(){
     
     pv_by_type <- nav_pv |> 
       left_join(sub_pv) |> 
-      mutate(pv = nav_pv + sub_pv)
+      mutate(across(nav_pv:sub_pv, ~ifelse(is.na(.), 0, .))) |> 
+      mutate(pv = nav_pv + sub_pv) 
     
     organic_pv <- pv_by_type |> 
       filter(traffic_type == "organic") |> 
