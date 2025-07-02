@@ -35,8 +35,9 @@ cm360_update <- function() {
   # credentials <- gcp_reauth()
   
   # GET CAMPAIGN METADATA ---------------------------------------------------
-  launch_utms <- get_utms("Launch KPIs")
-  sustain_utms <- get_utms("Sustain KPIs")
+  launch_utms <- get_utms("FY24 Launch KPIs")
+  sustain_q1_utms <- get_utms("FY25 Q1 KPIs")
+  sustain_q2_utms <- get_utms("FY25 Q2 KPIs")
   
   # DAILY PERFORMANCE -------------------------------------------------------
   # media_report <- get_latest_cm360_report(
@@ -66,13 +67,15 @@ cm360_update <- function() {
   
   clean_media <- merge_search(clean_media)
   
-  clean_media <- merge_disney(clean_media)
+  # clean_media <- merge_disney(clean_media)
   
   # get spend thresholds and flight dates out of the UTM data
   thresholds <- select(launch_utms, c(partner = source, type = medium, threshold = planned_budget,
                                       flight_start, flight_end)) |> 
-    bind_rows(select(sustain_utms, c(partner = source, type = medium, threshold = planned_budget,
-                                     flight_start, flight_end))) |> 
+    bind_rows(select(sustain_q1_utms, c(partner = source, type = medium, threshold = planned_budget,
+                                        flight_start, flight_end))) |> 
+    bind_rows(select(sustain_q2_utms, c(partner = source, type = medium, threshold = planned_budget,
+                                        flight_start, flight_end))) |> 
     mutate(partner = tolower(partner))
   
   clean_media_thresholds <- fuzzy_left_join(

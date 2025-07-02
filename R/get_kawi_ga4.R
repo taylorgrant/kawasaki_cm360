@@ -21,9 +21,10 @@ get_kawi_pv <- function(){
   
 
   # BRING IN SOURCE/MEDIUMS -------------------------------------------------
-  launch_utms <- get_utms("Launch KPIs")
-  sustain_utms <- get_utms("Sustain KPIs")
-  gsp_source_med <- unique(c(launch_utms$gsp_source_medium, sustain_utms$gsp_source_medium))
+  launch_utms <- get_utms("FY24 Launch KPIs")
+  sustain_q1_utms <- get_utms("FY25 Q1 KPIs")
+  sustain_q2_utms <- get_utms("FY25 Q2 KPIs")
+  gsp_source_med <- unique(c(launch_utms$gsp_source_medium, sustain_q1_utms$gsp_source_medium, sustain_q2_utms$gsp_source_medium))
   
   # summarize page views pulled
   summarize_page_views <- function(data, source_medium) {
