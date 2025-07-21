@@ -164,8 +164,17 @@ cm360_update <- function() {
     lags = list("pv" = 1, "CTV" = 1, "OLV" = 1, 
                 "Social" = 1, Digital = 1),
     diffs = c("CTV", "OLV", "Social", "Digital"),
+    # lagdiffs = list(pv = 1),
     ec = TRUE, simulate = FALSE)
   
+  # res <- dynardl(
+  #   pv ~ CTV + Social, 
+  #   data = filter(channel_dat, date <= "2025-06-30"),
+  #   lags = list("pv" = 1, "CTV" = 1,  
+  #               "Social" = 1),
+  #   diffs = c("CTV", "Social"),
+  #   lagdiffs = list(pv = 1),
+  #   ec = TRUE, simulate = FALSE)
   print(broom::tidy(summary(res)))
   
   # predict levels for day
