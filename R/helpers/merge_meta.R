@@ -1,6 +1,22 @@
 # Merge daily Meta data # 
 
-merge_meta <- function(data) {
+merge_meta <- function(vehicle, data) {
+  
+  # read in vehicle config file 
+  source <- "/home/rstudio/R/kawasaki_cm360/data/kawasaki_vehicle_config.xlsx"
+  sheets <- readxl::excel_sheets(source) # get sheet names
+  vehicle_configs <- purrr::set_names(sheets) |>
+    purrr::map(~ readxl::read_excel(source, sheet = .x))
+  
+  # define the META ID for the google sheet
+  meta_id <- vehicle_configs[[vehicle]] |>
+    filter(Source == "meta_daily") |>
+    pull(ID)
+  
+  # identify the sheets to use 
+  sheets <- if (vehicle == "NAV") c("meta launch", "meta sustain") else c("5525")
+  
+  # GET THE META DATA ---------------------------------------------------
   # pull in daily Meta data and merge into the performance data
   pacman::p_load(tidyverse, janitor, here, glue, googlesheets4, googledrive)
   options(gargle_oauth_cache = ".secrets",
@@ -34,18 +50,7 @@ merge_meta <- function(data) {
   numeric_cols <- c("amount_spent_usd", "impressions", "link_clicks", "video_plays",
                     "video_plays_at_100_percent", "post_engagements", "leads")
   
-  # Meta launch
-  df_launch <- read_sheet(ss = "17ioPxO_FgV8DjT8hHT5O8DMa8JEtRokKsTmoJoW0uKM",
-                   sheet = "meta launch") |>
-    clean_names() |> 
-    rename(ad_name = creative)
-  
-  # Meta sustain
-  df_sustain <- read_sheet(ss = "17ioPxO_FgV8DjT8hHT5O8DMa8JEtRokKsTmoJoW0uKM",
-                   sheet = "meta sustain") |>
-    clean_names()
-  
-  # function to clean sheet 
+  # Your existing column-fixing function (unchanged)
   fix_numeric_list_columns <- function(df) {
     for (col in names(df)) {
       col_data <- df[[col]]
@@ -63,33 +68,46 @@ merge_meta <- function(data) {
     df
   }
   
-  meta_launch_clean <- fix_numeric_list_columns(df_launch) |> 
-    rename(creative = ad_name)
-  meta_sustain_clean <- fix_numeric_list_columns(df_sustain)
+  # Function to read and clean each sheet
+  read_and_clean_meta <- function(sheet_name, meta_id) {
+    read_sheet(ss = meta_id, sheet = sheet_name) |>
+      clean_names() |>
+      (\(df) if (sheet_name == "meta launch") rename(df, ad_name = creative) else df)() |>
+      fix_numeric_list_columns()
+  }
   
-  # bind together 
-  meta_clean <- rbind(meta_launch_clean, meta_sustain_clean) |> 
-    mutate(reporting_starts = as.Date(reporting_starts),
-           across(amount_spent_usd:video_plays_at_100_percent, ~ ifelse(is.na(.), 0, .)))
-  
-  meta_clean <- meta_clean |> 
-    group_by(reporting_starts) |> 
-    summarise(media_cost = sum(amount_spent_usd),
-              impressions = sum(impressions, na.rm = TRUE),
-              clicks = sum(link_clicks, na.rm = TRUE),
-              video_plays = sum(video_plays, na.rm = TRUE),
-              video_completes = sum(video_plays_at_100_percent, na.rm = TRUE)) |> 
-    mutate(site_cm360 = "meta",
-           type = "Social",
-           placement_type = NA,
-           reporting_starts = as.Date(reporting_starts),
-           advertiser = "KAWASAKI MOTORS CORP",
-           campaign = case_when(
-             reporting_starts < "2025-04-01" ~ "FY25Q1_Kawasaki_NAV_Awareness_Brand",
-             TRUE ~ "FY25_Kawasaki_NAV_Sustain_Campaign"
-           )) |> 
-    rename(date = reporting_starts,
-           partner = site_cm360) 
+  # Read, clean, combine both sheets
+  meta_clean <- sheets |>
+    map_dfr(~ read_and_clean_meta(.x, meta_id)) |>
+    mutate(
+      reporting_starts = as.Date(reporting_starts),
+      across(amount_spent_usd:video_plays_at_100_percent, ~ ifelse(is.na(.), 0, .))
+    ) |>
+    group_by(reporting_starts) |>
+    summarise(
+      media_cost = sum(amount_spent_usd),
+      impressions = sum(impressions, na.rm = TRUE),
+      clicks = sum(link_clicks, na.rm = TRUE),
+      video_plays = sum(video_plays, na.rm = TRUE),
+      video_completes = sum(video_plays_at_100_percent, na.rm = TRUE),
+      .groups = "drop"
+    ) |>
+    mutate(
+      site_cm360 = "meta",
+      type = "Social",
+      advertiser = "KAWASAKI MOTORS CORP",
+      placement_type = NA,
+      campaign = case_when(
+        vehicle == "NAV" & reporting_starts < as.Date("2025-04-01") ~ "FY25Q1_Kawasaki_NAV_Awareness_Brand",
+        vehicle == "NAV" ~ "FY25_Kawasaki_NAV_Sustain_Campaign",
+        vehicle == "5525" & reporting_starts >= as.Date("2025-08-11") ~ "FY25_Kawasaki_5525_Awareness_Brand",
+        TRUE ~ NA_character_
+      )
+    ) |>
+    rename(
+      date = reporting_starts,
+      partner = site_cm360
+    )
   
 
   # MERGE CLEAN META WITH CM360 ---------------------------------------------
