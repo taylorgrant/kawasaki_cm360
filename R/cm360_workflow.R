@@ -102,7 +102,7 @@ cm360_workflow <- function(vehicle) {
   # MERGE SITE DIRECT PARTNERS AND CLEAN SPEND ------------------------------
   
   # THIS WILL HAVE TO BE UPDATED NEARER TO LAUNCH OF 5525 # 
-  clean_media <- merge_meta(performance) |> 
+  clean_media <- merge_meta(vehicle, performance) |> 
     mutate(partner = trimws(partner))
   
   # clean_media <- merge_nextdoor(clean_media) # manually merged in, not needed anymore
