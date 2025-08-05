@@ -20,6 +20,11 @@ cm360_workflow <- function(vehicle) {
     filter(Source == "google_sheet") |>
     pull(ID)
   
+  # get looker sheet name to write to for Fuse
+  looker_id <- vehicle_configs[[vehicle]] |>
+    filter(Source == "looker_sheet") |>
+    pull(ID)
+  
   # SET UP ------------------------------------------------------------------
   # packages 
   pacman::p_load(tidyverse, janitor, here, glue, reticulate, fuzzyjoin, googlesheets4, googledrive)
@@ -65,7 +70,8 @@ cm360_workflow <- function(vehicle) {
     # get spend thresholds and flights dates out of the UTM data
     thresholds <- select(q2_utms, c(partner = source, type = medium, threshold = planned_budget,
                                         flight_start, flight_end)) |>
-      mutate(partner = tolower(partner))
+      mutate(partner = tolower(partner)) |> 
+      filter(!is.na(threshold))
   }
   
   
@@ -180,4 +186,24 @@ cm360_workflow <- function(vehicle) {
   sheet_write(ss = gs4_id,
               arrange(capped_media, partner, date),
               sheet = "daily_cleaned")
+  
+
+  # WRITE RDS TO GOOGLE DRIVE -----------------------------------------------
+  
+  # get all of the data 
+  sheet_names <- sheet_names(gs4_id)
+  all_data <- set_names(sheet_names) |> # Read some sheets into a named list
+    map(~ read_sheet(gs4_id, sheet = .x))
+  
+  # temporary to save to google drive folder 
+  tmp <- tempfile(fileext = ".rds")
+  saveRDS(all_data, tmp)
+  
+  # Upload and overwrite the existing file
+  drive_upload(
+    media = tmp,
+    name = paste0(vehicle, "_data.rds"),
+    path = as_dribble("kawasaki_campaign"),
+    overwrite = TRUE
+  )
 }
