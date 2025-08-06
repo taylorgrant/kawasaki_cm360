@@ -10,8 +10,8 @@ merge_meta <- function(vehicle, data) {
   
   # define the META ID for the google sheet
   meta_id <- vehicle_configs[[vehicle]] |>
-    filter(Source == "meta_daily") |>
-    pull(ID)
+    dplyr::filter(Source == "meta_daily") |>
+    dplyr::pull(ID)
   
   # identify the sheets to use 
   sheets <- if (vehicle == "NAV") c("meta launch", "meta sustain") else c("5525")
