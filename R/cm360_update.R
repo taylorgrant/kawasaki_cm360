@@ -11,13 +11,13 @@ cm360_update <- function(vehicle) {
   
   # get google sheet id 
   gs4_id <- vehicle_configs[[vehicle]] |>
-    filter(Source == "google_sheet") |>
-    pull(ID)
+    dplyr::filter(Source == "google_sheet") |>
+    dplyr::pull(ID)
   
   # get looker sheet name to write to for Fuse
   looker_id <- vehicle_configs[[vehicle]] |>
-    filter(Source == "looker_sheet") |>
-    pull(ID)
+    dplyr::filter(Source == "looker_sheet") |>
+    dplyr::pull(ID)
   
   # SET UP ------------------------------------------------------------------
   # packages 
