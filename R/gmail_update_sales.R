@@ -1,0 +1,157 @@
+# Update daily sales via Kawi email # 
+
+gmail_update_sales <- function(vehicle) {
+  pacman::p_load(
+    tidyverse, janitor, here, glue, googlesheets4, gmailr, base64enc, lubridate,
+    googlesheets4, googledrive
+  )
+  
+  options(gargle_oauth_cache = "/home/rstudio/R/kawasaki_cm360/.secrets",
+          gargle_oauth_client_type = "web",
+          gargle_oauth_email = TRUE
+          # gargle_verbosity = "debug"
+  )
+  drive_auth()
+  
+  # VEHICLE CONFIG FILE -----------------------------------------------------
+  source <- "/home/rstudio/R/kawasaki_cm360/data/kawasaki_vehicle_config.xlsx"
+  sheets <- readxl::excel_sheets(source) # get sheet names
+  vehicle_configs <- purrr::set_names(sheets) |>
+    purrr::map(~ readxl::read_excel(source, sheet = .x))
+  
+  # get google sheet id 
+  gs4_id <- vehicle_configs[[vehicle]] |>
+    dplyr::filter(Source == "google_sheet") |>
+    dplyr::pull(ID)
+  
+  vehicle_subject <- vehicle_configs[[vehicle]] |>
+    dplyr::filter(Source == "gmail_subject") |>
+    dplyr::pull(ID)
+
+  # GMAIL SET UP ------------------------------------------------------------
+  token <- readRDS("/home/rstudio/.gmail-oauth/07c67c617ffee7cf1e64b4ff4ac85739_gspanalytics21@gmail.com")
+  gm_auth_configure(path = "/home/rstudio/R/kawasaki_cm360/credentials/gsp21-gmail.json")
+  gm_auth(token = token)
+  
+  # GMAIL - SEARCH FOR UNREAD EMAIL FROM KAWI WITH CSV ----------------------
+  query <- glue(
+    'from:Brandon.Flanders@kmc-usa.com has:attachment is:unread filename:csv subject:"{vehicle_subject}"'
+  )
+  msgs <- gm_messages(search = query, 
+                      num_results = 1)
+  
+  if (length(msgs[[1]]$messages) == 0) {
+    message("No unread email with .csv attachment found.")
+    return(invisible(NULL))
+  }
+  
+  msg_id <- msgs[[1]]$messages[[1]]$id
+  msg <- gm_message(msg_id)
+  
+  # -- Helper to extract all parts recursively --
+  find_all_parts <- function(part) {
+    if (!is.null(part$parts)) {
+      return(c(list(part), unlist(lapply(part$parts, find_all_parts), recursive = FALSE)))
+    } else {
+      return(list(part))
+    }
+  }
+  
+  # EXTRACT CSV -------------------------------------------------------------
+  all_parts <- find_all_parts(msg$payload)
+  csv_part <- Filter(function(p) {
+    !is.null(p$filename) &&
+      grepl("\\.csv$", p$filename, ignore.case = TRUE) &&
+      !is.null(p$body$attachmentId)
+  }, all_parts)[[1]]
+  
+  if (is.null(csv_part)) {
+    message("No CSV attachment found in the latest email.")
+    return(invisible(NULL))
+  }
+  
+  # -- Decode base64url attachment --
+  normalize_base64 <- function(x) {
+    x <- gsub("-", "+", x, fixed = TRUE)
+    x <- gsub("_", "/", x, fixed = TRUE)
+    pad_len <- 4 - (nchar(x) %% 4)
+    if (pad_len < 4) x <- paste0(x, strrep("=", pad_len))
+    x
+  }
+  
+  att <- gm_attachment(msg_id, id = csv_part$body$attachmentId)
+  raw_data <- base64decode(normalize_base64(att$data))
+  tmp_file <- tempfile(fileext = ".csv")
+  writeBin(raw_data, tmp_file)
+  
+  # READ DAILY FILE ---------------------------------------------------------
+  daily <- tryCatch({
+    read_delim(
+      file = tmp_file,
+      delim = "\t",
+      locale = locale(encoding = "UTF-16LE"),
+      show_col_types = FALSE
+    ) |>
+      clean_names() |>
+      mutate(
+        date = as.Date(mdy(date)),
+        dealer_number = as.numeric(dealer_number),
+        dealer_store_name = trimws(dealer_store_name)
+      )
+  }, error = function(e) {
+    stop("Failed to read daily dealer file: ", e$message)
+  })
+  
+
+  # GOOGLE SHEETS  ----------------------------------------------------------
+  # Read in current data
+  df <- tryCatch({
+    read_sheet(ss = gs4_id, sheet = "dealer_sales") |>
+      mutate(date = as.Date(date), dealer_number = as.numeric(dealer_number))
+  }, error = function(e) {
+    stop("Failed to read dealer sales from Google Sheets: ", e$message)
+  })
+  
+  processed_df <- tryCatch({
+    read_sheet(ss = gs4_id, sheet = "dealer_sales_processed") |>
+      mutate(date = as.Date(date))
+  }, error = function(e) {
+    stop("Failed to read dealer sales from Google Sheets: ", e$message)
+  })
+
+  # Check for daily sales
+  daily_sales <- daily |> filter(!is.na(retail_unit_count))
+
+  if (nrow(daily_sales) > 0) {
+    df <- bind_rows(df, select(daily_sales, -dealer_inventory_unit_count))
+  } else {
+    message("Daily file contains no new sales. Dealer sales table not updated, but daily sheet will still be refreshed.")
+  }
+
+  agg_sales <- df |>
+    group_by(dealer_number) |>
+    summarise(retail_unit_count = sum(retail_unit_count), .groups = "drop")
+
+  daily_updated <- daily |>
+    select(-retail_unit_count) |>
+    left_join(agg_sales, by = "dealer_number") |>
+    mutate(retail_unit_count = coalesce(retail_unit_count, 0))
+
+  # Mark off the day as processed
+  mark_today_processed <- function(df, today) {
+    df %>%
+      mutate(processed = ifelse(date == today, TRUE, processed))
+  }
+  
+  processed_df <- mark_today_processed(processed_df, today = daily_updated$date[1])
+
+  # Push to Google Sheets
+  sheet_write(df, ss = gs4_id, sheet = "dealer_sales")
+  sheet_write(daily_updated, ss = gs4_id, sheet = "daily_dealer_sales")
+  sheet_write(processed_df, ss = gs4_id, sheet = "dealer_sales_processed")
+
+  # Mark the message as read
+  gm_modify_message(msg_id, remove_labels = "UNREAD")
+
+  message("Sales data updated successfully.")
+}
