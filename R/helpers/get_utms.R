@@ -1,13 +1,5 @@
 # Get UTMs from Sheets #
 get_utms <- function(sheet){
-  pacman::p_load(tidyverse, janitor, glue, googlesheets4, googledrive)
-  
-  options(gargle_oauth_cache = ".secrets",
-          gargle_oauth_client_type = "web",
-          gargle_oauth_email = TRUE
-          # gargle_verbosity = "debug"
-  )
-  drive_auth()
   
   # Read the entire sheet without using column names
   sheet_data <- read_sheet("1n22hGOOTeCwbYljXcbe1PeAHentosKPbCZzgpReES10",

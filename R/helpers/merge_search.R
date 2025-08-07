@@ -1,16 +1,8 @@
 # Merge search data # 
 
 merge_search <- function(data){
-  # pull in daily Meta data and merge into the performance data
-  pacman::p_load(tidyverse, janitor, here, glue, googlesheets4, googledrive)
-  options(gargle_oauth_cache = ".secrets",
-          gargle_oauth_client_type = "web",
-          gargle_oauth_email = TRUE
-          # gargle_verbosity = "debug"
-  )
-  drive_auth()
   
-  # Nextdoor sustain
+  # Search sustain
   search_sustain <- read_sheet(ss = "17ioPxO_FgV8DjT8hHT5O8DMa8JEtRokKsTmoJoW0uKM",
                            sheet = "search sustain") |>
     clean_names() |> 
