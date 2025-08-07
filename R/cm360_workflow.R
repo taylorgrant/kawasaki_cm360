@@ -29,7 +29,7 @@ cm360_workflow <- function(vehicle) {
   # packages 
   pacman::p_load(tidyverse, janitor, here, glue, reticulate, fuzzyjoin, googlesheets4, googledrive)
   # googlesheets auth
-  options(gargle_oauth_cache = ".secrets",
+  options(gargle_oauth_cache = "/home/rstudio/R/kawasaki_cm360/.secrets",
           gargle_oauth_client_type = "web",
           gargle_oauth_email = TRUE
           # gargle_verbosity = "debug"

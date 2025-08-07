@@ -28,7 +28,7 @@ get_kawi_pv <- function(vehicle){
   source("/home/rstudio/R/kawasaki_cm360/R/helpers/get_utms.R")
   
   # AUTHENTICATE ------------------------------------------------------------
-  options(gargle_oauth_cache = ".secrets",
+  options(gargle_oauth_cache = "/home/rstudio/R/kawasaki_cm360/.secrets",
           gargle_oauth_client_type = "web",
           gargle_oauth_email = TRUE
           # gargle_verbosity = "debug"
