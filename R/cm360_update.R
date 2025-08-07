@@ -23,7 +23,7 @@ cm360_update <- function(vehicle) {
   # packages 
   pacman::p_load(tidyverse, janitor, here, glue, reticulate, fuzzyjoin, googlesheets4, googledrive, dynamac)
   # googlesheets auth
-  options(gargle_oauth_cache = ".secrets",
+  options(gargle_oauth_cache = "/home/rstudio/R/kawasaki_cm360/.secrets",
           gargle_oauth_client_type = "web",
           gargle_oauth_email = TRUE
           # gargle_verbosity = "debug"
@@ -130,131 +130,138 @@ cm360_update <- function(vehicle) {
     warning("Some rows have missing thresholds — check for unmatched partner/type combos.")
   }
   
-
   # EQUILIBRIUM MODEL (ECM) -------------------------------------------------
-  events <- readr::read_csv("/home/rstudio/R/kawasaki_cm360/data/NAV_events_list_daily.csv") |> 
-    janitor::clean_names() |> 
-    select(date = dates, event) |> 
-    mutate(date = lubridate::mdy(date))
-  
-  channel_dat <- capped_media |> 
-    group_by(date, type) |> 
-    summarise(spend = sum(media_cost)) |> 
-    pivot_wider(names_from = type, values_from = spend) |> 
-    mutate(across(CTV:Search, ~ ifelse(is.na(.), 0, .)),
-           date = as.Date(date)) |> 
-    left_join(opv) |> 
-    mutate(date = as.Date(date)) |> 
-    left_join(events) |> 
-    mutate(event = ifelse(is.na(event), 0, event))
-  
-  # channel model 
-  res <- dynardl(
-    pv ~ CTV + OLV + Social + Digital, 
-    data = channel_dat,
-    lags = list("pv" = 1, "CTV" = 1, "OLV" = 1, 
-                "Social" = 1, Digital = 1),
-    diffs = c("CTV", "OLV", "Social", "Digital"),
-    # lagdiffs = list(pv = 1),
-    ec = TRUE, simulate = FALSE)
-  
-  print(broom::tidy(summary(res)))
-  
-  # predict levels for day
-  predict_today_traffic_levels <- function(model, data_today, data_yesterday, dv = "pv", pval_cutoff = 0.1) {
-    library(broom)
+  if (vehicle == "NAV") {
+    events <- readr::read_csv("/home/rstudio/R/kawasaki_cm360/data/NAV_events_list_daily.csv") |> 
+      janitor::clean_names() |> 
+      select(date = dates, event) |> 
+      mutate(date = lubridate::mdy(date))
     
-    # Extract model summary
-    model_summary <- tidy(summary(model))
+    channel_dat <- capped_media |> 
+      group_by(date, type) |> 
+      summarise(spend = sum(media_cost)) |> 
+      pivot_wider(names_from = type, values_from = spend) |> 
+      mutate(across(CTV:Search, ~ ifelse(is.na(.), 0, .)),
+             date = as.Date(date)) |> 
+      left_join(opv) |> 
+      mutate(date = as.Date(date)) |> 
+      left_join(events) |> 
+      mutate(event = ifelse(is.na(event), 0, event))
     
-    # Intercept and ECT
-    intercept <- model_summary |> filter(term == "(Intercept)") |> pull(estimate)
-    ect <- model_summary |> filter(term == paste0("l.1.", dv)) |> pull(estimate)
+    # channel model 
+    res <- dynardl(
+      pv ~ CTV + OLV + Social + Digital, 
+      data = channel_dat,
+      lags = list("pv" = 1, "CTV" = 1, "OLV" = 1, 
+                  "Social" = 1, Digital = 1),
+      diffs = c("CTV", "OLV", "Social", "Digital"),
+      # lagdiffs = list(pv = 1),
+      ec = TRUE, simulate = FALSE)
     
-    # Short-run terms
-    sr_terms <- model_summary |>
-      filter(grepl("^d\\.1\\.", term)) |>
-      mutate(variable = gsub("d.1.", "", term)) |>
-      mutate(estimate = ifelse(p.value <= pval_cutoff, estimate, 0)) |>
-      select(variable, estimate)
+    print(broom::tidy(summary(res)))
     
-    # Long-run terms
-    lr_terms <- model_summary |>
-      filter(grepl(paste0("^l\\.1\\.(?!", dv, ")"), term, perl = TRUE)) |>
-      mutate(variable = gsub("l.1.", "", term)) |>
-      mutate(estimate = ifelse(p.value <= pval_cutoff, estimate, 0)) |>
-      select(variable, estimate)
+    # predict levels for day
+    predict_today_traffic_levels <- function(model, data_today, data_yesterday, dv = "pv", pval_cutoff = 0.1) {
+      library(broom)
+      
+      # Extract model summary
+      model_summary <- tidy(summary(model))
+      
+      # Intercept and ECT
+      intercept <- model_summary |> filter(term == "(Intercept)") |> pull(estimate)
+      ect <- model_summary |> filter(term == paste0("l.1.", dv)) |> pull(estimate)
+      
+      # Short-run terms
+      sr_terms <- model_summary |>
+        filter(grepl("^d\\.1\\.", term)) |>
+        mutate(variable = gsub("d.1.", "", term)) |>
+        mutate(estimate = ifelse(p.value <= pval_cutoff, estimate, 0)) |>
+        select(variable, estimate)
+      
+      # Long-run terms
+      lr_terms <- model_summary |>
+        filter(grepl(paste0("^l\\.1\\.(?!", dv, ")"), term, perl = TRUE)) |>
+        mutate(variable = gsub("l.1.", "", term)) |>
+        mutate(estimate = ifelse(p.value <= pval_cutoff, estimate, 0)) |>
+        select(variable, estimate)
+      
+      # Short-run contribution by channel
+      short_run_contrib <- sapply(sr_terms$variable, function(v) {
+        delta <- data_today[[v]] - data_yesterday[[v]]
+        coef <- sr_terms |> filter(variable == v) |> pull(estimate)
+        coef * delta
+      })
+      
+      short_run_total <- sum(short_run_contrib)
+      
+      # Long-run contribution by channel (to equilibrium)
+      long_run_contrib <- sapply(lr_terms$variable, function(v) {
+        coef <- lr_terms |> filter(variable == v) |> pull(estimate)
+        coef * data_yesterday[[v]]
+      })
+      
+      equilibrium <- intercept + sum(long_run_contrib)
+      deviation <- data_yesterday[[dv]] - equilibrium
+      adjustment <- ect * deviation
+      
+      # Final prediction
+      predicted_pv <- data_yesterday[[dv]] + short_run_total + adjustment
+      
+      return(list(
+        predicted_pv = predicted_pv,
+        short_run_total = short_run_total,
+        adjustment = adjustment,
+        deviation = deviation,
+        equilibrium = equilibrium,
+        short_run_contrib = short_run_contrib,
+        long_run_contrib = long_run_contrib
+      ))
+    }
     
-    # Short-run contribution by channel
-    short_run_contrib <- sapply(sr_terms$variable, function(v) {
-      delta <- data_today[[v]] - data_yesterday[[v]]
-      coef <- sr_terms |> filter(variable == v) |> pull(estimate)
-      coef * delta
-    })
+    # build the dataframe 
+    create_attribution_df <- function(model, data, dv = "pv", start_row = 2) {
+      results <- map_dfr(start_row:nrow(data), function(t) {
+        data_today <- data[t, ]
+        data_yesterday <- data[t - 1, ]
+        
+        pred <- predict_today_traffic_levels(
+          model = model,
+          data_today = data_today,
+          data_yesterday = data_yesterday,
+          dv = dv
+        )
+        
+        # Format per-channel contributions
+        sr_contrib <- pred$short_run_contrib %>% 
+          setNames(paste0(names(.), "_short_run")) |> 
+          as_tibble_row()
+        
+        lr_contrib <- pred$long_run_contrib %>% 
+          setNames(paste0(names(.), "_long_run")) |> 
+          as_tibble_row()
+        
+        # Combine into one row
+        tibble(
+          date = data_today$date,
+          actual_pv = data_today[[dv]],
+          predicted_pv = pred$predicted_pv,
+          deviation = pred$deviation,
+          adjustment = pred$adjustment,
+          short_run_total = pred$short_run_total
+        ) %>%
+          bind_cols(sr_contrib, lr_contrib)
+      })
+    }
     
-    short_run_total <- sum(short_run_contrib)
+    # Example usage
+    attribution_df <- create_attribution_df(model = res, data = channel_dat, start_row = 30)
     
-    # Long-run contribution by channel (to equilibrium)
-    long_run_contrib <- sapply(lr_terms$variable, function(v) {
-      coef <- lr_terms |> filter(variable == v) |> pull(estimate)
-      coef * data_yesterday[[v]]
-    })
-    
-    equilibrium <- intercept + sum(long_run_contrib)
-    deviation <- data_yesterday[[dv]] - equilibrium
-    adjustment <- ect * deviation
-    
-    # Final prediction
-    predicted_pv <- data_yesterday[[dv]] + short_run_total + adjustment
-    
-    return(list(
-      predicted_pv = predicted_pv,
-      short_run_total = short_run_total,
-      adjustment = adjustment,
-      deviation = deviation,
-      equilibrium = equilibrium,
-      short_run_contrib = short_run_contrib,
-      long_run_contrib = long_run_contrib
-    ))
+    # write attribution to NAV Media
+    sheet_write(ss = gs4_id,
+                attribution_df,
+                sheet = "attribution_df")
   }
   
-  # build the dataframe 
-  create_attribution_df <- function(model, data, dv = "pv", start_row = 2) {
-    results <- map_dfr(start_row:nrow(data), function(t) {
-      data_today <- data[t, ]
-      data_yesterday <- data[t - 1, ]
-      
-      pred <- predict_today_traffic_levels(
-        model = model,
-        data_today = data_today,
-        data_yesterday = data_yesterday,
-        dv = dv
-      )
-      
-      # Format per-channel contributions
-      sr_contrib <- pred$short_run_contrib %>% 
-        setNames(paste0(names(.), "_short_run")) |> 
-        as_tibble_row()
-      
-      lr_contrib <- pred$long_run_contrib %>% 
-        setNames(paste0(names(.), "_long_run")) |> 
-        as_tibble_row()
-      
-      # Combine into one row
-      tibble(
-        date = data_today$date,
-        actual_pv = data_today[[dv]],
-        predicted_pv = pred$predicted_pv,
-        deviation = pred$deviation,
-        adjustment = pred$adjustment,
-        short_run_total = pred$short_run_total
-      ) %>%
-        bind_cols(sr_contrib, lr_contrib)
-    })
-  }
-  
-  # Example usage
-  attribution_df <- create_attribution_df(model = res, data = channel_dat, start_row = 30)
   
   # WRITE TO SHEETS ---------------------------------------------------------
   
@@ -269,11 +276,6 @@ cm360_update <- function(vehicle) {
   sheet_write(ss = gs4_id,
               arrange(capped_media, partner, date),
               sheet = "daily_cleaned")
-  
-  # write attribution to NAV Media
-  sheet_write(ss = gs4_id,
-              attribution_df,
-              sheet = "attribution_df")
   
   # WRITE RDS TO GOOGLE DRIVE -----------------------------------------------
   
