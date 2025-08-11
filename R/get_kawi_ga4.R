@@ -182,8 +182,13 @@ get_kawi_pv <- function(vehicle){
   sheet_write(ss = gs4_id, out_list$pv_by_type, sheet = "pv_by_type")
   sheet_write(ss = gs4_id, out_list$organic_pv, sheet = "organic_pv")
   sheet_write(ss = gs4_id, out_list$paid_pv, sheet = "paid_pv")
-  sheet_append(ss = gs4_id, out_list$newvreturn, sheet = "newvreturn")
-  sheet_append(ss = gs4_id, out_list$geo_region, sheet = "geo_region")
+  if (nrow(out_list$newvreturn) > 0){
+    sheet_append(ss = gs4_id, out_list$newvreturn, sheet = "newvreturn")
+  }
+  if (nrow(out_list$geo_region) > 0){
+    sheet_append(ss = gs4_id, out_list$geo_region, sheet = "geo_region")
+  }
+  
 }
 
 
