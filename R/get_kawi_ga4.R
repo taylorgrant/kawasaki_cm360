@@ -3,7 +3,7 @@
 get_kawi_pv <- function(vehicle){
   
   cat("---------------- GA4 data pulled on:", as.character(Sys.Date()), "-------------------- \n")
-  
+  cat("---------------- PULLING GA4 DATA FOR:", vehicle, "----------------------------------- \n\n")
   # read in config file
   source <- "/home/rstudio/R/kawasaki_cm360/data/kawasaki_vehicle_config.xlsx"
   sheets <- readxl::excel_sheets(source) # get sheet names
