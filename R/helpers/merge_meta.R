@@ -24,22 +24,29 @@ merge_meta <- function(vehicle, data) {
   # 1. Clean the performance data and summarize to partner and channel
   tmpdat <- data |>
     # filter(str_detect(campaign, "Sustain")) |>
-    mutate(across(impressions:media_cost, as.numeric)) |>
-    mutate(
+    dplyr::mutate(across(impressions:media_cost, as.numeric)) |>
+    dplyr::mutate(
       partner = tolower(sapply(stringr::str_split(placement, "_"), "[[", 1)),
       placement_type = NA,
-      type = sapply(str_split(placement, "_"), "[[", 10),
-      type = case_when(
+      type = sapply(stringr::str_split(placement, "_"), "[[", 10),
+      type = dplyr::case_when(
         type == "SOC" ~ "Social",
         type == "DIS" ~ "Digital",
         is.na(type) ~ "Unknown",
         TRUE ~ type
       ),
-      campaign = str_replace_all(campaign, "FY26", "FY25"),
+      campaign = stringr::str_replace_all(campaign, "FY26", "FY25"),
       date = as.Date(date)
     ) |>
-    group_by(date, advertiser, campaign, partner, type, placement_type) |>
-    summarise(
+    dplyr::group_by(
+      date,
+      advertiser,
+      campaign,
+      partner,
+      type,
+      placement_type
+    ) |>
+    dplyr::summarise(
       impressions = sum(impressions),
       clicks = sum(clicks),
       media_cost = round(sum(media_cost)),
@@ -86,26 +93,30 @@ merge_meta <- function(vehicle, data) {
 
   # Function to read and clean each sheet
   read_and_clean_meta <- function(sheet_name, meta_id) {
-    read_sheet(ss = meta_id, sheet = sheet_name) |>
-      clean_names() |>
+    googlesheets4::read_sheet(ss = meta_id, sheet = sheet_name) |>
+      janitor::clean_names() |>
       (\(df) {
-        if (sheet_name == "meta launch") rename(df, ad_name = creative) else df
+        if (sheet_name == "meta launch") {
+          dplyr::rename(df, ad_name = creative)
+        } else {
+          df
+        }
       })() |>
       fix_numeric_list_columns()
   }
 
   # Read, clean, combine both sheets
   meta_clean <- sheets |>
-    map_dfr(~ read_and_clean_meta(.x, meta_id)) |>
-    mutate(
+    purrr::map_dfr(~ read_and_clean_meta(.x, meta_id)) |>
+    dplyr::mutate(
       reporting_starts = as.Date(reporting_starts),
-      across(
+      dplyr::across(
         amount_spent_usd:video_plays_at_100_percent,
         ~ ifelse(is.na(.), 0, .)
       )
     ) |>
-    group_by(reporting_starts) |>
-    summarise(
+    dplyr::group_by(reporting_starts) |>
+    dplyr::summarise(
       media_cost = sum(amount_spent_usd),
       impressions = sum(impressions, na.rm = TRUE),
       clicks = sum(link_clicks, na.rm = TRUE),
@@ -113,7 +124,7 @@ merge_meta <- function(vehicle, data) {
       video_completes = sum(video_plays_at_100_percent, na.rm = TRUE),
       .groups = "drop"
     ) |>
-    mutate(
+    dplyr::mutate(
       site_cm360 = "meta",
       type = "Social",
       advertiser = "KAWASAKI MOTORS CORP",
@@ -127,7 +138,7 @@ merge_meta <- function(vehicle, data) {
         TRUE ~ NA_character_
       )
     ) |>
-    rename(
+    dplyr::rename(
       date = reporting_starts,
       partner = site_cm360
     )
@@ -138,14 +149,16 @@ merge_meta <- function(vehicle, data) {
   #   pull(date)
 
   meta_dates_in_clean <- meta_clean |>
-    pull(date)
+    dplyr::pull(date)
 
   tmpdat <- tmpdat |>
-    ungroup() |>
-    filter(!(partner == "meta" & date %in% meta_dates_in_clean)) |>
-    bind_rows(meta_clean |> filter(date %in% meta_dates_in_clean)) |>
-    mutate(partner = trimws(partner)) |>
-    arrange(partner, type, date)
+    dplyr::ungroup() |>
+    dplyr::filter(!(partner == "meta" & date %in% meta_dates_in_clean)) |>
+    dplyr::bind_rows(
+      meta_clean |> dplyr::filter(date %in% meta_dates_in_clean)
+    ) |>
+    dplyr::mutate(partner = trimws(partner)) |>
+    dplyr::arrange(partner, type, date)
 
   return(tmpdat)
 }
