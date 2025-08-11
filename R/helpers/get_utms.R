@@ -1,7 +1,7 @@
 # Get UTMs from Sheets #
 get_utms <- function(sheet) {
   # Read the entire sheet without using column names
-  sheet_data <- read_sheet(
+  sheet_data <- googlesheets4::read_sheet(
     "1n22hGOOTeCwbYljXcbe1PeAHentosKPbCZzgpReES10",
     sheet = sheet,
     col_names = FALSE
@@ -15,12 +15,12 @@ get_utms <- function(sheet) {
   }
 
   # Read again using detected header row
-  data <- read_sheet(
+  data <- googlesheets4::read_sheet(
     "1n22hGOOTeCwbYljXcbe1PeAHentosKPbCZzgpReES10",
     sheet = sheet,
     skip = header_row - 1
   ) |>
-    clean_names()
+    janitor::clean_names()
 
   # Check required columns exist
   required_cols <- c("source", "medium", "budget_needed", "flight")
@@ -31,11 +31,11 @@ get_utms <- function(sheet) {
 
   # Read the sheet again, this time using that row as the header
   data <- data |>
-    select(source, medium, planned_budget = budget_needed, flight) |>
-    mutate(
+    dplyr::select(source, medium, planned_budget = budget_needed, flight) |>
+    dplyr::mutate(
       gsp_source_medium = glue::glue("{tolower(source)} / {tolower(medium)}"),
-      flight_start = mdy(trimws(gsub("\\-.*", "", flight))),
-      flight_end = mdy(trimws(gsub(".*\\-", "", flight)))
+      flight_start = lubridate::mdy(trimws(gsub("\\-.*", "", flight))),
+      flight_end = lubridate::mdy(trimws(gsub(".*\\-", "", flight)))
     )
   return(data)
 }
