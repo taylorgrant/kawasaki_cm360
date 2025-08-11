@@ -34,8 +34,11 @@ gmail_update_sales <- function(vehicle) {
   gm_auth(token = token)
   
   # GMAIL - SEARCH FOR UNREAD EMAIL FROM KAWI WITH CSV ----------------------
+  # query <- glue(
+  #   'from:Brandon.Flanders@kmc-usa.com has:attachment is:unread filename:csv subject:"{vehicle_subject}"'
+  # )
   query <- glue(
-    'from:Brandon.Flanders@kmc-usa.com has:attachment is:unread filename:csv subject:"{vehicle_subject}"'
+    'from:taylor_grant@gspsf.com has:attachment is:unread filename:csv subject:"{vehicle_subject}"'
   )
   msgs <- gm_messages(search = query, 
                       num_results = 1)
@@ -125,7 +128,7 @@ gmail_update_sales <- function(vehicle) {
   if (nrow(daily_sales) > 0) {
     df <- bind_rows(df, select(daily_sales, -dealer_inventory_unit_count))
   } else {
-    message("Daily file contains no new sales. Dealer sales table not updated, but daily sheet will still be refreshed.")
+    base::message("Daily file contains no new sales. Dealer sales table not updated, but daily sheet will still be refreshed.")
   }
 
   agg_sales <- df |>
@@ -153,5 +156,5 @@ gmail_update_sales <- function(vehicle) {
   # Mark the message as read
   gm_modify_message(msg_id, remove_labels = "UNREAD")
 
-  message("Sales data updated successfully.")
+  base::message("Sales data updated successfully.")
 }
