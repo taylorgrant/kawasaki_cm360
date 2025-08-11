@@ -34,7 +34,7 @@ gmail_update_meta <- function(vehicle) {
   gmailr::gm_auth(token = token)
   
   # GMAIL - SEARCH FOR UNREAD EMAIL FROM DATORAMA WITH XLSX ----------------------
-  query <- glue(
+  query <- glue::glue(
     'from:noreply@datorama.com has:attachment is:unread filename:xlsx subject:"{vehicle_subject}"'
   )
   msgs <- gmailr::gm_messages(search = query, 
@@ -79,14 +79,14 @@ gmail_update_meta <- function(vehicle) {
     x
   }
   
-  att <- gm_attachment(msg_id, id = xlsx_part$body$attachmentId)
+  att <- gmailr::gm_attachment(msg_id, id = xlsx_part$body$attachmentId)
   raw_data <- base64enc::base64decode(normalize_base64(att$data))
   tmp_file <- tempfile(fileext = ".xlsx")
   writeBin(raw_data, tmp_file)
   
   # READ DAILY FILE ---------------------------------------------------------
   daily_meta <- tryCatch({
-    readxl::read_excel(tmp_file, skip = 3) |>
+    readxl::read_excel(tmp_file, skip = 1) |>
       janitor::clean_names() |>
       dplyr::mutate(
         `Reporting starts` = as.Date(as.numeric(day), origin = "1899-12-30"),
@@ -94,9 +94,9 @@ gmail_update_meta <- function(vehicle) {
         `Campaign name` = "Leads_Auction_Kawasaki GS&P US PTV H1'25 Sustain_Q2'25 OP050409_META CPA KAWASAKI SUSTAIN LEAD GEN Q2 PL184209",
         `Ad Set Name` = paste0("META CPA KAWASAKI SUSTAIN LEAD GEN Q2 PL184209_Leads_States_INT_ALL_", targeting_tactic)
       ) |>
-      dplyr::filter(`Reporting starts` == Sys.Date()-1) |> 
-      dplyr::filtergroup_by(`Reporting starts`, Creative, `Campaign name`, `Ad Set Name`) |> 
-      dplyr::filtersummarise(
+      dplyr::filter(`Reporting starts` == Sys.Date()-2) |> 
+      dplyr::group_by(`Reporting starts`, Creative, `Campaign name`, `Ad Set Name`) |> 
+      dplyr::summarise(
         `Amount spent (USD)` = sum(media_cost, na.rm = TRUE),
         Impressions = sum(impressions, na.rm = TRUE),
         `Link clicks` = sum(clicks_links, na.rm = TRUE),
