@@ -377,7 +377,7 @@ cm360_update <- function(vehicle) {
 
   # get all of the data
   sheet_names <- googlesheets4::sheet_names(gs4_id)
-  all_data <- rlang::set_names(sheet_names) |> # Read some sheets into a named list
+  all_data <- purrr::set_names(sheet_names) |> # Read some sheets into a named list
     purrr::map(~ googlesheets4::read_sheet(gs4_id, sheet = .x))
 
   # temporary to save to google drive folder

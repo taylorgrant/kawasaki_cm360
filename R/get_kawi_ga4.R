@@ -49,10 +49,10 @@ get_kawi_pv <- function(vehicle) {
     gargle_oauth_email = TRUE
     # gargle_verbosity = "debug"
   )
-  drive_auth()
+  googledrive::drive_auth()
 
   readRenviron("/home/rstudio/R/kawasaki_cm360/.Renviron")
-  ga_auth(json_file = Sys.getenv("GA_AUTH_FILE"))
+  googleAnalyticsR::ga_auth(json_file = Sys.getenv("GA_AUTH_FILE"))
   my_property_id <- 249558280
 
   # BRING IN SOURCE/MEDIUMS -------------------------------------------------
@@ -77,48 +77,51 @@ get_kawi_pv <- function(vehicle) {
 
     # nav_pv summary (always present)
     nav_pv <- data$nav_pv |>
-      mutate(
-        traffic_type = case_when(
+      dplyr::mutate(
+        traffic_type = dplyr::case_when(
           sessionSourceMedium %in% c(source_medium, fuse_sess_med) ~ "paid",
-          str_detect(sessionSourceMedium, "socialpaid") ~ "paid",
+          stringr::str_detect(sessionSourceMedium, "socialpaid") ~ "paid",
           TRUE ~ "organic"
         )
       ) |>
-      group_by(date, traffic_type) |>
-      summarise(nav_pv = sum(screenPageViews), .groups = "drop")
+      dplyr::group_by(date, traffic_type) |>
+      dplyr::summarise(nav_pv = sum(screenPageViews), .groups = "drop")
 
     # sub_pv summary (optional)
     if (!is.null(data$sub_pv)) {
       sub_pv <- data$sub_pv |>
-        mutate(
-          traffic_type = case_when(
+        dplyr::mutate(
+          traffic_type = dplyr::case_when(
             sessionSourceMedium %in% c(source_medium, fuse_sess_med) ~ "paid",
-            str_detect(sessionSourceMedium, "socialpaid") ~ "paid",
+            stringr::str_detect(sessionSourceMedium, "socialpaid") ~ "paid",
             TRUE ~ "organic"
           )
         ) |>
-        group_by(date, traffic_type) |>
-        summarise(sub_pv = sum(screenPageViews), .groups = "drop")
+        dplyr::group_by(date, traffic_type) |>
+        dplyr::summarise(sub_pv = sum(screenPageViews), .groups = "drop")
     } else {
       sub_pv <- nav_pv |>
-        mutate(sub_pv = 0) |>
-        select(date, traffic_type, sub_pv)
+        dplyr::mutate(sub_pv = 0) |>
+        dplyr::select(date, traffic_type, sub_pv)
     }
 
     pv_by_type <- nav_pv |>
-      left_join(sub_pv, by = c("date", "traffic_type")) |>
-      mutate(across(c(nav_pv, sub_pv), ~ ifelse(is.na(.), 0, .))) |>
-      mutate(pv = nav_pv + sub_pv)
+      dplyr::left_join(sub_pv, by = c("date", "traffic_type")) |>
+      dplyr::mutate(dplyr::across(
+        c(nav_pv, sub_pv),
+        ~ ifelse(is.na(.), 0, .)
+      )) |>
+      dplyr::mutate(pv = nav_pv + sub_pv)
 
     organic_pv <- pv_by_type |>
-      filter(traffic_type == "organic") |>
-      group_by(date) |>
-      summarise(pv = sum(pv))
+      dplyr::filter(traffic_type == "organic") |>
+      dplyr::group_by(date) |>
+      dplyr::summarise(pv = sum(pv))
 
     paid_pv <- pv_by_type |>
-      filter(traffic_type == "paid") |>
-      group_by(date) |>
-      summarise(pv = sum(pv))
+      dplyr::filter(traffic_type == "paid") |>
+      dplyr::group_by(date) |>
+      dplyr::summarise(pv = sum(pv))
 
     list(pv_by_type = pv_by_type, organic_pv = organic_pv, paid_pv = paid_pv)
   }
@@ -131,27 +134,31 @@ get_kawi_pv <- function(vehicle) {
     end_date = Sys.Date() - 1
   ) {
     # Always fetch nav_pv
-    nav_pv <- ga_data(
+    nav_pv <- googleAnalyticsR::ga_data(
       my_property_id,
       metrics = c("screenPageViews"),
       dimensions = c("date", "sessionSourceMedium", "pagePath"),
       date_range = c(as.character(start_date), as.character(end_date)),
-      dim_filters = ga_data_filter("pagePath" %contains% page_path),
+      dim_filters = googleAnalyticsR::ga_data_filter(
+        "pagePath" %contains% page_path
+      ),
       limit = -1
     ) |>
-      mutate(sessionSourceMedium = tolower(sessionSourceMedium))
+      dplyr::mutate(sessionSourceMedium = tolower(sessionSourceMedium))
 
     # Only fetch sub_pv for NAV
     sub_pv <- if (vehicle == "NAV") {
-      ga_data(
+      googleAnalyticsR::ga_data(
         my_property_id,
         metrics = c("screenPageViews"),
         dimensions = c("date", "hostname", "sessionSourceMedium", "pagePath"),
         date_range = c(as.character(start_date), as.character(end_date)),
-        dim_filters = ga_data_filter("hostname" %contains% "nav"),
+        dim_filters = googleAnalyticsR::ga_data_filter(
+          "hostname" %contains% "nav"
+        ),
         limit = -1
       ) |>
-        mutate(sessionSourceMedium = tolower(sessionSourceMedium))
+        dplyr::mutate(sessionSourceMedium = tolower(sessionSourceMedium))
     } else {
       NULL
     }
@@ -170,7 +177,7 @@ get_kawi_pv <- function(vehicle) {
   # New vs Returning page views by date (paid only)
   new_v_returning <- function(page_path, source_medium) {
     # get pageviews for nav pages
-    nav_pv <- ga_data(
+    nav_pv <- googleAnalyticsR::ga_data(
       my_property_id,
       metrics = c("screenPageViews"),
       dimensions = c(
@@ -183,20 +190,22 @@ get_kawi_pv <- function(vehicle) {
         as.character(Sys.Date() - 1),
         as.character(Sys.Date() - 1)
       ),
-      dim_filters = ga_data_filter("pagePath" %contains% page_path),
+      dim_filters = googleAnalyticsR::ga_data_filter(
+        "pagePath" %contains% page_path
+      ),
       limit = -1
     ) |>
-      mutate(sessionSourceMedium = tolower(sessionSourceMedium))
+      dplyr::mutate(sessionSourceMedium = tolower(sessionSourceMedium))
 
     # categorizing paid media
     fuse_sess_med <- c("google / cpc")
 
     # split out New v Returning per day
     nav_pv |>
-      mutate(
-        traffic_type = case_when(
+      dplyr::mutate(
+        traffic_type = dplyr::case_when(
           sessionSourceMedium %in% c(source_medium, fuse_sess_med) ~ 'paid',
-          str_detect(sessionSourceMedium, "socialpaid") ~ "paid",
+          stringr::str_detect(sessionSourceMedium, "socialpaid") ~ "paid",
           TRUE ~ "organic"
         ),
         newVsReturning = ifelse(
@@ -210,14 +219,14 @@ get_kawi_pv <- function(vehicle) {
           newVsReturning
         )
       ) |>
-      group_by(date, traffic_type, newVsReturning) |>
-      summarise(nav_pv = sum(screenPageViews)) |>
-      group_by(date, traffic_type) |>
-      mutate(frac = nav_pv / sum(nav_pv))
+      dplyr::group_by(date, traffic_type, newVsReturning) |>
+      dplyr::summarise(nav_pv = sum(screenPageViews)) |>
+      dplyr::group_by(date, traffic_type) |>
+      dplyr::mutate(frac = nav_pv / sum(nav_pv))
   }
   newvreturn <- new_v_returning(ga4_path, gsp_source_med)
 
-  geo_region <- ga_data(
+  geo_region <- googleAnalyticsR::ga_data(
     my_property_id,
     dimensions = c("date", "city", "region", "sessionSourceMedium"),
     metrics = c("sessions", "averageSessionDuration"),
@@ -225,23 +234,39 @@ get_kawi_pv <- function(vehicle) {
     limit = -1
     # dim_filters = ga_data_filter("sessionSourceMedium" %contains% gsp_source_med),
   ) |>
-    mutate(sessionSourceMedium = tolower(sessionSourceMedium)) |>
-    filter(sessionSourceMedium %in% gsp_source_med) |>
-    group_by(sessionSourceMedium) |>
-    slice_max(sessions, n = 20, with_ties = FALSE)
+    dplyr::mutate(sessionSourceMedium = tolower(sessionSourceMedium)) |>
+    dplyr::filter(sessionSourceMedium %in% gsp_source_med) |>
+    dplyr::group_by(sessionSourceMedium) |>
+    dplyr::slice_max(sessions, n = 20, with_ties = FALSE)
 
   out_list <- c(out, list(newvreturn = newvreturn, geo_region = geo_region))
 
   # writing to Google Sheets
 
   # create sheet for the first run
-  sheet_write(ss = gs4_id, out_list$pv_by_type, sheet = "pv_by_type")
-  sheet_write(ss = gs4_id, out_list$organic_pv, sheet = "organic_pv")
-  sheet_write(ss = gs4_id, out_list$paid_pv, sheet = "paid_pv")
+  googlesheets4::sheet_write(
+    ss = gs4_id,
+    out_list$pv_by_type,
+    sheet = "pv_by_type"
+  )
+  googlesheets4::sheet_write(
+    ss = gs4_id,
+    out_list$organic_pv,
+    sheet = "organic_pv"
+  )
+  googlesheets4::sheet_write(ss = gs4_id, out_list$paid_pv, sheet = "paid_pv")
   if (nrow(out_list$newvreturn) > 0) {
-    sheet_append(ss = gs4_id, out_list$newvreturn, sheet = "newvreturn")
+    googlesheets4::sheet_append(
+      ss = gs4_id,
+      out_list$newvreturn,
+      sheet = "newvreturn"
+    )
   }
   if (nrow(out_list$geo_region) > 0) {
-    sheet_append(ss = gs4_id, out_list$geo_region, sheet = "geo_region")
+    googlesheets4::sheet_append(
+      ss = gs4_id,
+      out_list$geo_region,
+      sheet = "geo_region"
+    )
   }
 }

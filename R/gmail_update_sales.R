@@ -20,7 +20,7 @@ gmail_update_sales <- function(vehicle) {
     gargle_oauth_email = TRUE
     # gargle_verbosity = "debug"
   )
-  drive_auth()
+  googledrive::drive_auth()
 
   # VEHICLE CONFIG FILE -----------------------------------------------------
   source <- "/home/rstudio/R/kawasaki_cm360/data/kawasaki_vehicle_config.xlsx"
@@ -41,27 +41,27 @@ gmail_update_sales <- function(vehicle) {
   token <- readRDS(
     "/home/rstudio/.gmail-oauth/07c67c617ffee7cf1e64b4ff4ac85739_gspanalytics21@gmail.com"
   )
-  gm_auth_configure(
+  gmailr::gm_auth_configure(
     path = "/home/rstudio/R/kawasaki_cm360/credentials/gsp21-gmail.json"
   )
-  gm_auth(token = token)
+  gmailr::gm_auth(token = token)
 
   # GMAIL - SEARCH FOR UNREAD EMAIL FROM KAWI WITH CSV ----------------------
   # query <- glue(
   #   'from:Brandon.Flanders@kmc-usa.com has:attachment is:unread filename:csv subject:"{vehicle_subject}"'
   # )
-  query <- glue(
+  query <- glue::glue(
     'from:taylor_grant@gspsf.com has:attachment is:unread filename:csv subject:"{vehicle_subject}"'
   )
-  msgs <- gm_messages(search = query, num_results = 1)
+  msgs <- gmailr::gm_messages(search = query, num_results = 1)
 
   if (length(msgs[[1]]$messages) == 0) {
-    message("No unread email with .csv attachment found.")
+    base::message("No unread email with .csv attachment found.")
     return(invisible(NULL))
   }
 
   msg_id <- msgs[[1]]$messages[[1]]$id
-  msg <- gm_message(msg_id)
+  msg <- gmailr::gm_message(msg_id)
 
   # -- Helper to extract all parts recursively --
   find_all_parts <- function(part) {
@@ -102,23 +102,23 @@ gmail_update_sales <- function(vehicle) {
     x
   }
 
-  att <- gm_attachment(msg_id, id = csv_part$body$attachmentId)
-  raw_data <- base64decode(normalize_base64(att$data))
+  att <- gmailr::gm_attachment(msg_id, id = csv_part$body$attachmentId)
+  raw_data <- base64enc::base64decode(normalize_base64(att$data))
   tmp_file <- tempfile(fileext = ".csv")
   writeBin(raw_data, tmp_file)
 
   # READ DAILY FILE ---------------------------------------------------------
   daily <- tryCatch(
     {
-      read_delim(
+      readr::read_delim(
         file = tmp_file,
         delim = "\t",
         locale = locale(encoding = "UTF-16LE"),
         show_col_types = FALSE
       ) |>
-        clean_names() |>
-        mutate(
-          date = as.Date(mdy(date)),
+        dplyr::clean_names() |>
+        dplyr::mutate(
+          date = as.Date(lubridate::mdy(date)),
           dealer_number = as.numeric(dealer_number),
           dealer_store_name = trimws(dealer_store_name)
         )
@@ -132,8 +132,11 @@ gmail_update_sales <- function(vehicle) {
   # Read in current data
   df <- tryCatch(
     {
-      read_sheet(ss = gs4_id, sheet = "dealer_sales") |>
-        mutate(date = as.Date(date), dealer_number = as.numeric(dealer_number))
+      googlesheets4::read_sheet(ss = gs4_id, sheet = "dealer_sales") |>
+        dplyr::mutate(
+          date = as.Date(date),
+          dealer_number = as.numeric(dealer_number)
+        )
     },
     error = function(e) {
       stop("Failed to read dealer sales from Google Sheets: ", e$message)
@@ -142,8 +145,11 @@ gmail_update_sales <- function(vehicle) {
 
   processed_df <- tryCatch(
     {
-      read_sheet(ss = gs4_id, sheet = "dealer_sales_processed") |>
-        mutate(date = as.Date(date))
+      googlesheets4::read_sheet(
+        ss = gs4_id,
+        sheet = "dealer_sales_processed"
+      ) |>
+        dplyr::mutate(date = as.Date(date))
     },
     error = function(e) {
       stop("Failed to read dealer sales from Google Sheets: ", e$message)
@@ -151,12 +157,12 @@ gmail_update_sales <- function(vehicle) {
   )
 
   # Check for daily sales
-  daily_sales <- daily |> filter(!is.na(retail_unit_count))
+  daily_sales <- daily |> dplyr::filter(!is.na(retail_unit_count))
 
   if (nrow(daily_sales) > 0) {
     df <- dplyr::bind_rows(
       df,
-      select(daily_sales, -dealer_inventory_unit_count)
+      dplyr::select(daily_sales, -dealer_inventory_unit_count)
     )
   } else {
     base::message(
@@ -165,18 +171,21 @@ gmail_update_sales <- function(vehicle) {
   }
 
   agg_sales <- df |>
-    group_by(dealer_number) |>
-    summarise(retail_unit_count = sum(retail_unit_count), .groups = "drop")
+    dplyr::group_by(dealer_number) |>
+    dplyr::summarise(
+      retail_unit_count = sum(retail_unit_count),
+      .groups = "drop"
+    )
 
   daily_updated <- daily |>
-    select(-retail_unit_count) |>
-    left_join(agg_sales, by = "dealer_number") |>
-    mutate(retail_unit_count = coalesce(retail_unit_count, 0))
+    dplyr::select(-retail_unit_count) |>
+    dplyr::left_join(agg_sales, by = "dealer_number") |>
+    dplyr::mutate(retail_unit_count = dplyr::coalesce(retail_unit_count, 0))
 
   # Mark off the day as processed
   mark_today_processed <- function(df, today) {
     df %>%
-      mutate(processed = ifelse(date == today, TRUE, processed))
+      dplyr::mutate(processed = ifelse(date == today, TRUE, processed))
   }
 
   processed_df <- mark_today_processed(
@@ -185,12 +194,20 @@ gmail_update_sales <- function(vehicle) {
   )
 
   # Push to Google Sheets
-  sheet_write(df, ss = gs4_id, sheet = "dealer_sales")
-  sheet_write(daily_updated, ss = gs4_id, sheet = "daily_dealer_sales")
-  sheet_write(processed_df, ss = gs4_id, sheet = "dealer_sales_processed")
+  googlesheets4::sheet_write(df, ss = gs4_id, sheet = "dealer_sales")
+  googlesheets4::sheet_write(
+    daily_updated,
+    ss = gs4_id,
+    sheet = "daily_dealer_sales"
+  )
+  googlesheets4::sheet_write(
+    processed_df,
+    ss = gs4_id,
+    sheet = "dealer_sales_processed"
+  )
 
   # Mark the message as read
-  gm_modify_message(msg_id, remove_labels = "UNREAD")
+  gmailr::gm_modify_message(msg_id, remove_labels = "UNREAD")
 
   base::message("Sales data updated successfully.")
 }
