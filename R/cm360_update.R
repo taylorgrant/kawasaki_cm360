@@ -42,7 +42,7 @@ cm360_update <- function(vehicle) {
     gargle_oauth_email = TRUE
     # gargle_verbosity = "debug"
   )
-  drive_auth()
+  googledrive::drive_auth()
 
   source("/home/rstudio/R/kawasaki_cm360/R/helpers/get_utms.R")
   source("/home/rstudio/R/kawasaki_cm360/R/helpers/merge_meta.R")
@@ -56,7 +56,7 @@ cm360_update <- function(vehicle) {
     sustain_q1_utms <- get_utms("FY25 Q1 KPIs")
     sustain_q2_utms <- get_utms("FY25 Q2 KPIs")
     # get spend thresholds and flight dates out of the UTM data
-    thresholds <- select(
+    thresholds <- dplyr::select(
       launch_utms,
       c(
         partner = source,
@@ -66,7 +66,7 @@ cm360_update <- function(vehicle) {
         flight_end
       )
     ) |>
-      bind_rows(select(
+      dplyr::bind_rows(dplyr::select(
         sustain_q1_utms,
         c(
           partner = source,
@@ -76,7 +76,7 @@ cm360_update <- function(vehicle) {
           flight_end
         )
       )) |>
-      bind_rows(select(
+      dplyr::bind_rows(dplyr::select(
         sustain_q2_utms,
         c(
           partner = source,
@@ -86,11 +86,11 @@ cm360_update <- function(vehicle) {
           flight_end
         )
       )) |>
-      mutate(partner = tolower(partner))
+      dplyr::mutate(partner = tolower(partner))
   } else {
     q2_utms <- get_utms("FY25 5525 Q2 UTM & KPIs")
     # get spend thresholds and flights dates out of the UTM data
-    thresholds <- select(
+    thresholds <- dplyr::select(
       q2_utms,
       c(
         partner = source,
@@ -100,22 +100,22 @@ cm360_update <- function(vehicle) {
         flight_end
       )
     ) |>
-      mutate(partner = tolower(partner)) |>
-      filter(!is.na(threshold))
+      dplyr::mutate(partner = tolower(partner)) |>
+      dplyr::filter(!is.na(threshold))
   }
 
   # GET FULL PERFORMANCE ----------------------------------------------------
-  performance <- read_sheet(ss = gs4_id, sheet = "performance")
+  performance <- googlesheets4::read_sheet(ss = gs4_id, sheet = "performance")
 
-  opv <- read_sheet(ss = gs4_id, sheet = "organic_pv")
+  opv <- googlesheets4::read_sheet(ss = gs4_id, sheet = "organic_pv")
 
   # MERGE SITE DIRECT PARTNERS AND CLEAN SPEND ------------------------------
   clean_media <- merge_meta(vehicle, performance) |>
-    mutate(partner = trimws(partner))
+    dplyr::mutate(partner = trimws(partner))
 
   clean_media <- merge_search(clean_media)
 
-  clean_media_thresholds <- fuzzy_left_join(
+  clean_media_thresholds <- fuzzyjoin::fuzzy_left_join(
     clean_media,
     thresholds,
     by = c(
@@ -128,12 +128,12 @@ cm360_update <- function(vehicle) {
   )
 
   clean_media_thresholds <- clean_media_thresholds |>
-    select(-partner.y, -type.y) |>
-    rename(
+    dplyr::select(-partner.y, -type.y) |>
+    dplyr::rename(
       partner = partner.x,
       type = type.x
     ) |>
-    mutate(
+    dplyr::mutate(
       partner = ifelse(
         partner == "youtube",
         "YouTube",
@@ -143,14 +143,14 @@ cm360_update <- function(vehicle) {
 
   # Clean and cap the media spend based on thresholds and flights
   capped_media <- clean_media_thresholds |>
-    arrange(partner, type, flight_start, date) |>
-    group_by(partner, type, flight_start, flight_end) |>
-    mutate(
+    dplyr::arrange(partner, type, flight_start, date) |>
+    dplyr::group_by(partner, type, flight_start, flight_end) |>
+    dplyr::mutate(
       # 1. Flag whether date is within flight window
       in_flight = date >= flight_start & date <= flight_end,
 
       # 2. Only include media cost if in flight
-      spend_in_flight = if_else(in_flight, media_cost, 0),
+      spend_in_flight = dplyr::if_else(in_flight, media_cost, 0),
 
       # 3. Cumulative raw spend (before capping)
       cumulative_spend_raw = cumsum(spend_in_flight),
@@ -159,7 +159,7 @@ cm360_update <- function(vehicle) {
       cumulative_spend_capped = pmin(cumulative_spend_raw, threshold),
 
       # 5. Adjust media cost:
-      media_cost_adjusted = case_when(
+      media_cost_adjusted = dplyr::case_when(
         !in_flight ~ 0, # not in flight? zero it
         lag(cumulative_spend_raw, default = 0) < threshold &
           cumulative_spend_raw >= threshold ~
@@ -170,12 +170,12 @@ cm360_update <- function(vehicle) {
       threshold_crossed = lag(cumulative_spend_raw, default = 0) < threshold &
         cumulative_spend_raw >= threshold
     ) |>
-    ungroup() |>
-    filter(!(impressions == 0 & media_cost == 0)) |>
-    filter(!is.na(date), !is.na(media_cost_adjusted)) |>
+    dplyr::ungroup() |>
+    dplyr::filter(!(impressions == 0 & media_cost == 0)) |>
+    dplyr::filter(!is.na(date), !is.na(media_cost_adjusted)) |>
     # adding in the Amazon spend from the Launch phase
-    ungroup() |>
-    arrange(date, partner)
+    dplyr::ungroup() |>
+    dplyr::arrange(date, partner)
 
   if (any(is.na(capped_media$threshold))) {
     warning(
@@ -189,24 +189,24 @@ cm360_update <- function(vehicle) {
       "/home/rstudio/R/kawasaki_cm360/data/NAV_events_list_daily.csv"
     ) |>
       janitor::clean_names() |>
-      select(date = dates, event) |>
-      mutate(date = lubridate::mdy(date))
+      dplyr::select(date = dates, event) |>
+      dplyr::mutate(date = lubridate::mdy(date))
 
     channel_dat <- capped_media |>
-      group_by(date, type) |>
-      summarise(spend = sum(media_cost)) |>
-      pivot_wider(names_from = type, values_from = spend) |>
-      mutate(
-        across(CTV:Search, ~ ifelse(is.na(.), 0, .)),
+      dplyr::group_by(date, type) |>
+      dplyr::summarise(spend = sum(media_cost)) |>
+      tidyr::pivot_wider(names_from = type, values_from = spend) |>
+      dplyr::mutate(
+        dplyr::across(CTV:Search, ~ ifelse(is.na(.), 0, .)),
         date = as.Date(date)
       ) |>
-      left_join(opv) |>
-      mutate(date = as.Date(date)) |>
-      left_join(events) |>
-      mutate(event = ifelse(is.na(event), 0, event))
+      dplyr::left_join(opv) |>
+      dplyr::mutate(date = as.Date(date)) |>
+      dplyr::left_join(events) |>
+      dplyr::mutate(event = ifelse(is.na(event), 0, event))
 
     # channel model
-    res <- dynardl(
+    res <- dynamac::dynardl(
       pv ~ CTV + OLV + Social + Digital,
       data = channel_dat,
       lags = list("pv" = 1, "CTV" = 1, "OLV" = 1, "Social" = 1, Digital = 1),
@@ -229,34 +229,40 @@ cm360_update <- function(vehicle) {
       library(broom)
 
       # Extract model summary
-      model_summary <- tidy(summary(model))
+      model_summary <- broom::tidy(summary(model))
 
       # Intercept and ECT
       intercept <- model_summary |>
-        filter(term == "(Intercept)") |>
-        pull(estimate)
+        dplyr::filter(term == "(Intercept)") |>
+        dplyr::pull(estimate)
       ect <- model_summary |>
-        filter(term == paste0("l.1.", dv)) |>
-        pull(estimate)
+        dplyr::filter(term == paste0("l.1.", dv)) |>
+        dplyr::pull(estimate)
 
       # Short-run terms
       sr_terms <- model_summary |>
-        filter(grepl("^d\\.1\\.", term)) |>
-        mutate(variable = gsub("d.1.", "", term)) |>
-        mutate(estimate = ifelse(p.value <= pval_cutoff, estimate, 0)) |>
-        select(variable, estimate)
+        dplyr::filter(grepl("^d\\.1\\.", term)) |>
+        dplyr::mutate(variable = gsub("d.1.", "", term)) |>
+        dplyr::mutate(estimate = ifelse(p.value <= pval_cutoff, estimate, 0)) |>
+        dplyr::select(variable, estimate)
 
       # Long-run terms
       lr_terms <- model_summary |>
-        filter(grepl(paste0("^l\\.1\\.(?!", dv, ")"), term, perl = TRUE)) |>
-        mutate(variable = gsub("l.1.", "", term)) |>
-        mutate(estimate = ifelse(p.value <= pval_cutoff, estimate, 0)) |>
-        select(variable, estimate)
+        dplyr::filter(grepl(
+          paste0("^l\\.1\\.(?!", dv, ")"),
+          term,
+          perl = TRUE
+        )) |>
+        dplyr::mutate(variable = gsub("l.1.", "", term)) |>
+        dplyr::mutate(estimate = ifelse(p.value <= pval_cutoff, estimate, 0)) |>
+        dplyr::select(variable, estimate)
 
       # Short-run contribution by channel
       short_run_contrib <- sapply(sr_terms$variable, function(v) {
         delta <- data_today[[v]] - data_yesterday[[v]]
-        coef <- sr_terms |> filter(variable == v) |> pull(estimate)
+        coef <- sr_terms |>
+          dplyr::filter(variable == v) |>
+          dplyr::pull(estimate)
         coef * delta
       })
 
@@ -264,7 +270,9 @@ cm360_update <- function(vehicle) {
 
       # Long-run contribution by channel (to equilibrium)
       long_run_contrib <- sapply(lr_terms$variable, function(v) {
-        coef <- lr_terms |> filter(variable == v) |> pull(estimate)
+        coef <- lr_terms |>
+          dplyr::filter(variable == v) |>
+          dplyr::pull(estimate)
         coef * data_yesterday[[v]]
       })
 
@@ -288,7 +296,7 @@ cm360_update <- function(vehicle) {
 
     # build the dataframe
     create_attribution_df <- function(model, data, dv = "pv", start_row = 2) {
-      results <- map_dfr(start_row:nrow(data), function(t) {
+      results <- purrr::map_dfr(start_row:nrow(data), function(t) {
         data_today <- data[t, ]
         data_yesterday <- data[t - 1, ]
 
@@ -301,15 +309,15 @@ cm360_update <- function(vehicle) {
 
         # Format per-channel contributions
         sr_contrib <- pred$short_run_contrib %>%
-          setNames(paste0(names(.), "_short_run")) |>
-          as_tibble_row()
+          stats::setNames(paste0(names(.), "_short_run")) |>
+          tibble::as_tibble_row()
 
         lr_contrib <- pred$long_run_contrib %>%
-          setNames(paste0(names(.), "_long_run")) |>
-          as_tibble_row()
+          stats::setNames(paste0(names(.), "_long_run")) |>
+          tibble::as_tibble_row()
 
         # Combine into one row
-        tibble(
+        tibble::tibble(
           date = data_today$date,
           actual_pv = data_today[[dv]],
           predicted_pv = pred$predicted_pv,
@@ -317,7 +325,7 @@ cm360_update <- function(vehicle) {
           adjustment = pred$adjustment,
           short_run_total = pred$short_run_total
         ) %>%
-          bind_cols(sr_contrib, lr_contrib)
+          dplyr::bind_cols(sr_contrib, lr_contrib)
       })
     }
 
@@ -329,15 +337,19 @@ cm360_update <- function(vehicle) {
     )
 
     # write attribution to NAV Media
-    sheet_write(ss = gs4_id, attribution_df, sheet = "attribution_df")
+    googlesheets4::sheet_write(
+      ss = gs4_id,
+      attribution_df,
+      sheet = "attribution_df"
+    )
   }
 
   # WRITE TO SHEETS ---------------------------------------------------------
 
   # write to Looker sheet
-  sheet_write(
+  googlesheets4::sheet_write(
     ss = "1cNopOsZBrl0jT5yP1ghkLlDYoY_uGoS5cOD1hE4Zrcg",
-    select(
+    dplyr::select(
       capped_media,
       c(
         date,
@@ -355,28 +367,28 @@ cm360_update <- function(vehicle) {
   )
 
   # write to NAV Media
-  sheet_write(
+  googlesheets4::sheet_write(
     ss = gs4_id,
-    arrange(capped_media, partner, date),
+    dplyr::arrange(capped_media, partner, date),
     sheet = "daily_cleaned"
   )
 
   # WRITE RDS TO GOOGLE DRIVE -----------------------------------------------
 
   # get all of the data
-  sheet_names <- sheet_names(gs4_id)
-  all_data <- set_names(sheet_names) |> # Read some sheets into a named list
-    map(~ read_sheet(gs4_id, sheet = .x))
+  sheet_names <- googlesheets4::sheet_names(gs4_id)
+  all_data <- rlang::set_names(sheet_names) |> # Read some sheets into a named list
+    purrr::map(~ googlesheets4::read_sheet(gs4_id, sheet = .x))
 
   # temporary to save to google drive folder
   tmp <- tempfile(fileext = ".rds")
   saveRDS(all_data, tmp)
 
   # Upload and overwrite the existing file
-  drive_upload(
+  googledrive::drive_upload(
     media = tmp,
     name = paste0(vehicle, "_data.rds"),
-    path = as_dribble("kawasaki_campaign"),
+    path = googledrive::as_dribble("kawasaki_campaign"),
     overwrite = TRUE
   )
 }
