@@ -1,19 +1,25 @@
 # Update daily meta from Channel Factory #
 
 gmail_update_meta <- function(vehicle) {
-  pacman::p_load(
-    tidyverse,
-    janitor,
-    here,
-    glue,
-    googlesheets4,
-    gmailr,
-    base64enc,
-    lubridate,
-    googlesheets4,
-    googledrive
-  )
+  # pacman::p_load(
+  #   tidyverse,
+  #   janitor,
+  #   here,
+  #   glue,
+  #   googlesheets4,
+  #   gmailr,
+  #   base64enc,
+  #   lubridate,
+  #   googlesheets4,
+  #   googledrive
+  # )
 
+  cat(
+    "---------------------  Meta Data updated on:",
+    format(Sys.time(), tz = "America/Los_Angeles"),
+    "------------------------ \n"
+  )
+  
   options(
     gargle_oauth_cache = "/home/rstudio/R/kawasaki_cm360/.secrets",
     gargle_oauth_client_type = "web",
@@ -107,7 +113,7 @@ gmail_update_meta <- function(vehicle) {
   # READ DAILY FILE ---------------------------------------------------------
   daily_meta <- tryCatch(
     {
-      readxl::read_excel(tmp_file, skip = 1) |>
+      readxl::read_excel(tmp_file, skip = 3) |>
         janitor::clean_names() |>
         dplyr::mutate(
           `Reporting starts` = as.Date(as.numeric(day), origin = "1899-12-30"),
@@ -118,7 +124,7 @@ gmail_update_meta <- function(vehicle) {
             targeting_tactic
           )
         ) |>
-        dplyr::filter(`Reporting starts` == Sys.Date() - 2) |>
+        dplyr::filter(`Reporting starts` == Sys.Date() - 1) |>
         dplyr::group_by(
           `Reporting starts`,
           Creative,
@@ -142,7 +148,7 @@ gmail_update_meta <- function(vehicle) {
 
   # GOOGLE SHEETS  ----------------------------------------------------------
   if (nrow(daily_meta) > 0) {
-    googlesheets4::sheet_append(ss = meta_id, daily_meta, sheet = meta_sustain)
+    googlesheets4::sheet_append(ss = meta_id, daily_meta, sheet = "meta sustain")
   }
 
   # Mark the message as read
