@@ -65,8 +65,8 @@ cm360_workflow <- function(vehicle) {
   )
   source("/home/rstudio/R/kawasaki_cm360/R/helpers/get_utms.R")
   source("/home/rstudio/R/kawasaki_cm360/R/helpers/merge_meta.R")
-  # source("/home/rstudio/R/kawasaki_cm360/R/helpers/merge_nextdoor.R")
   source("/home/rstudio/R/kawasaki_cm360/R/helpers/merge_search.R")
+  source("/home/rstudio/R/kawasaki_cm360/R/helpers/ecm_helpers.R")
 
   # reauthorize the token here
   credentials <- gcp_reauth()
@@ -154,15 +154,16 @@ cm360_workflow <- function(vehicle) {
 
   # Bind rows together for full view of campaign
   performance <- rbind(performance_df, media_df)
+  
+  # get OPV for modeling 
+  opv <- googlesheets4::read_sheet(ss = gs4_id, sheet = "organic_pv")
 
   # MERGE SITE DIRECT PARTNERS AND CLEAN SPEND ------------------------------
 
-  # THIS WILL HAVE TO BE UPDATED NEARER TO LAUNCH OF 5525 #
   clean_media <- merge_meta(vehicle, performance) |>
     dplyr::mutate(partner = trimws(partner))
 
-  # clean_media <- merge_nextdoor(clean_media) # manually merged in, not needed anymore
-
+  # this might need to change once 5525 is live (assuming there is a search component)
   if (vehicle == "NAV") {
     clean_media <- merge_search(clean_media)
   }
@@ -234,6 +235,57 @@ cm360_workflow <- function(vehicle) {
     )
   }
 
+  # EQUILIBRIUM MODEL (ECM) -------------------------------------------------
+  # this is not set up for 5525 yet - not enough data # 
+  if (vehicle == "NAV") {
+    events <- readr::read_csv(
+      "/home/rstudio/R/kawasaki_cm360/data/NAV_events_list_daily.csv"
+    ) |>
+      janitor::clean_names() |>
+      dplyr::select(date = dates, event) |>
+      dplyr::mutate(date = lubridate::mdy(date))
+    
+    channel_dat <- capped_media |>
+      dplyr::group_by(date, type) |>
+      dplyr::summarise(spend = sum(media_cost)) |>
+      tidyr::pivot_wider(names_from = type, values_from = spend) |>
+      dplyr::mutate(
+        dplyr::across(CTV:Search, ~ ifelse(is.na(.), 0, .)),
+        date = as.Date(date)
+      ) |>
+      dplyr::left_join(opv) |>
+      dplyr::mutate(date = as.Date(date)) |>
+      dplyr::left_join(events) |>
+      dplyr::mutate(event = ifelse(is.na(event), 0, event))
+    
+    # channel model
+    res <- dynamac::dynardl(
+      pv ~ CTV + OLV + Social + Digital,
+      data = channel_dat,
+      lags = list("pv" = 1, "CTV" = 1, "OLV" = 1, "Social" = 1, Digital = 1),
+      diffs = c("CTV", "OLV", "Social", "Digital"),
+      # lagdiffs = list(pv = 1),
+      ec = TRUE,
+      simulate = FALSE
+    )
+    
+    print(broom::tidy(summary(res)))
+  
+    # usage - helpers are pre-loaded
+    attribution_df <- create_attribution_df(
+      model = res,
+      data = channel_dat,
+      start_row = 30
+    )
+    
+    # write attribution to NAV Media
+    googlesheets4::sheet_write(
+      ss = gs4_id,
+      attribution_df,
+      sheet = "attribution_df"
+    )
+  }
+  
   # WRITE TO SHEETS ---------------------------------------------------------
   # put the day's data into the overall performance tab
   googlesheets4::sheet_append(ss = gs4_id, media_df, sheet = "performance")
@@ -255,7 +307,7 @@ cm360_workflow <- function(vehicle) {
         media_cost = media_cost_adjusted
       )
     ),
-    sheet = "daily"
+    sheet = looker_id
   )
 
   # write to NAV Media
