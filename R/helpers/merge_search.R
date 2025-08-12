@@ -6,7 +6,7 @@ merge_search <- function(data) {
     ss = "17ioPxO_FgV8DjT8hHT5O8DMa8JEtRokKsTmoJoW0uKM",
     sheet = "search sustain"
   ) |>
-    dplyr::clean_names() |>
+    janitor::clean_names() |>
     dplyr::mutate(
       date = as.Date(date),
       advertiser = "KAWASAKI MOTORS CORP",
