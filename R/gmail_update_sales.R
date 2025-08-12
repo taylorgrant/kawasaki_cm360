@@ -1,18 +1,18 @@
 # Update daily sales via Kawi email #
 
 gmail_update_sales <- function(vehicle) {
-  pacman::p_load(
-    tidyverse,
-    janitor,
-    here,
-    glue,
-    googlesheets4,
-    gmailr,
-    base64enc,
-    lubridate,
-    googlesheets4,
-    googledrive
-  )
+  # pacman::p_load(
+  #   tidyverse,
+  #   janitor,
+  #   here,
+  #   glue,
+  #   googlesheets4,
+  #   gmailr,
+  #   base64enc,
+  #   lubridate,
+  #   googlesheets4,
+  #   googledrive
+  # )
 
   options(
     gargle_oauth_cache = "/home/rstudio/R/kawasaki_cm360/.secrets",
@@ -116,7 +116,7 @@ gmail_update_sales <- function(vehicle) {
         locale = locale(encoding = "UTF-16LE"),
         show_col_types = FALSE
       ) |>
-        dplyr::clean_names() |>
+        janitor::clean_names() |>
         dplyr::mutate(
           date = as.Date(lubridate::mdy(date)),
           dealer_number = as.numeric(dealer_number),
