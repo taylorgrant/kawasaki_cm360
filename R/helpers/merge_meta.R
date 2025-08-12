@@ -129,7 +129,7 @@ merge_meta <- function(vehicle, data) {
       type = "Social",
       advertiser = "KAWASAKI MOTORS CORP",
       placement_type = NA,
-      campaign = case_when(
+      campaign = dplyr::case_when(
         vehicle == "NAV" & reporting_starts < as.Date("2025-04-01") ~
           "FY25Q1_Kawasaki_NAV_Awareness_Brand",
         vehicle == "NAV" ~ "FY25_Kawasaki_NAV_Sustain_Campaign",

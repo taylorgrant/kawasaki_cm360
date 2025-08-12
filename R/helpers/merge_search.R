@@ -41,7 +41,7 @@ merge_search <- function(data) {
     dplyr::filter(
       !(partner == "google" & type == "Search" & date %in% search_dates_in_dat)
     ) |>
-    dplyr::bind_rows(search_sustain |> filter(date %in% search_dates_in_dat)) |>
+    dplyr::bind_rows(search_sustain |> dplyr::filter(date %in% search_dates_in_dat)) |>
     dplyr::arrange(partner, type, date)
   return(tmpdat)
 }
