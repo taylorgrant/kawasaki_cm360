@@ -210,4 +210,24 @@ gmail_update_sales <- function(vehicle) {
   gmailr::gm_modify_message(msg_id, remove_labels = "UNREAD")
 
   base::message("Sales data updated successfully.")
+  
+  # This is temporary until i get email address switched over with kawi # 
+  # WRITE RDS TO GOOGLE DRIVE -----------------------------------------------
+  
+  # get all of the data
+  sheet_names <- googlesheets4::sheet_names(gs4_id)
+  all_data <- purrr::set_names(sheet_names) |> # Read some sheets into a named list
+    purrr::map(~ googlesheets4::read_sheet(gs4_id, sheet = .x))
+  
+  # temporary to save to google drive folder
+  tmp <- tempfile(fileext = ".rds")
+  saveRDS(all_data, tmp)
+  
+  # Upload and overwrite the existing file
+  googledrive::drive_upload(
+    media = tmp,
+    name = paste0(vehicle, "_data.rds"),
+    path = googledrive::as_dribble("kawasaki_campaign"),
+    overwrite = TRUE
+  )
 }
