@@ -129,7 +129,7 @@ cm360_workflow <- function(vehicle) {
   # DAILY PERFORMANCE -------------------------------------------------------
 
   media_report <- get_latest_cm360_report(
-    profile_id = "10081289",
+    profile_id = "10081289", # this is constant
     report_id = as.character(cm360_id)
   )
 
@@ -139,10 +139,8 @@ cm360_workflow <- function(vehicle) {
       as.numeric
     )) |>
     janitor::clean_names() |>
-    # filter(str_detect(campaign, "Sustain")) |> # filter in CM360 report obviates this
     dplyr::filter(
       !impressions == 0
-      #& !media_cost == 0
     )
 
   # GET FULL PERFORMANCE ----------------------------------------------------
@@ -153,7 +151,7 @@ cm360_workflow <- function(vehicle) {
   )
 
   # Bind rows together for full view of campaign
-  performance <- rbind(performance_df, media_df)
+  performance <- dplyr::bind_rows(performance_df, media_df)
   
   # get OPV for modeling 
   opv <- googlesheets4::read_sheet(ss = gs4_id, sheet = "organic_pv")
@@ -163,7 +161,7 @@ cm360_workflow <- function(vehicle) {
   clean_media <- merge_meta(vehicle, performance) |>
     dplyr::mutate(partner = trimws(partner))
 
-  # this might need to change once 5525 is live (assuming there is a search component)
+  # this might need to change once TeryxH2 is live (assuming there is a search component)
   if (vehicle == "NAV") {
     clean_media <- merge_search(clean_media)
   }
@@ -236,7 +234,7 @@ cm360_workflow <- function(vehicle) {
   }
 
   # EQUILIBRIUM MODEL (ECM) -------------------------------------------------
-  # this is not set up for 5525 yet - not enough data # 
+  # this is not set up for TeryxH2 yet - not enough data # 
   if (vehicle == "NAV") {
     events <- readr::read_csv(
       "/home/rstudio/R/kawasaki_cm360/data/NAV_events_list_daily.csv"
@@ -310,7 +308,7 @@ cm360_workflow <- function(vehicle) {
     sheet = looker_id
   )
 
-  # write to NAV Media
+  # write to vehicle Media (GSP sheets)
   googlesheets4::sheet_write(
     ss = gs4_id,
     dplyr::arrange(capped_media, partner, date),
