@@ -36,6 +36,7 @@ get_utms <- function(sheet) {
       gsp_source_medium = glue::glue("{tolower(source)} / {tolower(medium)}"),
       flight_start = lubridate::mdy(trimws(gsub("\\-.*", "", flight))),
       flight_end = lubridate::mdy(trimws(gsub(".*\\-", "", flight)))
-    )
+    ) |> 
+    dplyr::filter(!is.na(planned_budget)) # dropping UTMs that have empty budgets
   return(data)
 }
