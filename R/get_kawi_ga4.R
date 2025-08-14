@@ -243,7 +243,7 @@ get_kawi_pv <- function(vehicle) {
 
   # writing to Google Sheets
 
-  # create sheet for the first run
+  # write sheets
   googlesheets4::sheet_write(
     ss = gs4_id,
     out_list$pv_by_type,
