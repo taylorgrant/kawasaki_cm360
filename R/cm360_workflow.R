@@ -64,6 +64,7 @@ cm360_workflow <- function(vehicle) {
   source("/home/rstudio/R/kawasaki_cm360/R/helpers/get_utms.R")
   source("/home/rstudio/R/kawasaki_cm360/R/helpers/merge_meta.R")
   source("/home/rstudio/R/kawasaki_cm360/R/helpers/merge_search.R")
+  source("/home/rstudio/R/kawasaki_cm360/R/helpers/merge_youtube.R")
   source("/home/rstudio/R/kawasaki_cm360/R/helpers/ecm_helpers.R")
 
   # reauthorize the token here
@@ -162,6 +163,10 @@ cm360_workflow <- function(vehicle) {
   # this might need to change once TeryxH2 is live (assuming there is a search component)
   if (vehicle == "NAV") {
     clean_media <- merge_search(clean_media)
+  }
+  
+  if (vehicle == "TeryxH2") {
+    clean_media <- merge_youtube(clean_media)
   }
 
   clean_media_thresholds <- fuzzyjoin::fuzzy_left_join(
