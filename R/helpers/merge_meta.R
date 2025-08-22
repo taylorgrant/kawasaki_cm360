@@ -16,7 +16,7 @@ merge_meta <- function(vehicle, data) {
   sheets <- if (vehicle == "NAV") {
     c("meta launch", "meta sustain")
   } else {
-    c("5525")
+    c("meta")
   }
 
   # GET THE META DATA ---------------------------------------------------
@@ -133,7 +133,7 @@ merge_meta <- function(vehicle, data) {
         vehicle == "NAV" & reporting_starts < as.Date("2025-04-01") ~
           "FY25Q1_Kawasaki_NAV_Awareness_Brand",
         vehicle == "NAV" ~ "FY25_Kawasaki_NAV_Sustain_Campaign",
-        vehicle == "5525" & reporting_starts >= as.Date("2025-08-11") ~
+        vehicle == "TeryxH2" & reporting_starts >= as.Date("2025-08-11") ~
           "FY25_Kawasaki_5525_Awareness_Brand",
         TRUE ~ NA_character_
       )
