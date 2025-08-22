@@ -2,9 +2,7 @@
 
 cm360_workflow <- function(vehicle) {
   cat(
-    "---------------------  Data pulled on:",
-    as.character(Sys.Date()),
-    "------------------------ \n"
+    "---------------------  Data pulled on:", as.character(Sys.Date()), "------------------------ \n"
   )
 
   # read in config file
