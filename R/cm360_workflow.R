@@ -160,13 +160,13 @@ cm360_workflow <- function(vehicle) {
   clean_media <- merge_meta(vehicle, performance) |>
     dplyr::mutate(partner = trimws(partner))
 
-  # this might need to change once TeryxH2 is live (assuming there is a search component)
   if (vehicle == "NAV") {
-    clean_media <- merge_search(clean_media)
+    clean_media <- merge_search(clean_media, "NAV")
   }
   
   if (vehicle == "TeryxH2") {
     clean_media <- merge_youtube(clean_media)
+    clean_media <- merge_search(clean_media, "TeryxH2")
   }
 
   clean_media_thresholds <- fuzzyjoin::fuzzy_left_join(
