@@ -1,16 +1,29 @@
 # Merge search data #
 
-merge_search <- function(data) {
-  # Search sustain
-  search_sustain <- googlesheets4::read_sheet(
-    ss = "17ioPxO_FgV8DjT8hHT5O8DMa8JEtRokKsTmoJoW0uKM",
-    sheet = "search sustain"
-  ) |>
+merge_search <- function(data, vehicle) {
+  
+  if (vehicle == "NAV") {
+    search <- googlesheets4::read_sheet(
+      ss = "17ioPxO_FgV8DjT8hHT5O8DMa8JEtRokKsTmoJoW0uKM",
+      sheet = "search sustain"
+    )
+  } else {
+    search <- googlesheets4::read_sheet(
+      ss = "1lfSZD2eR1Qozc9dkrhp2pUftvlIFmdr3Z_SyDjxNH6E",
+      sheet = "search"
+    )
+  }
+  veh <- switch(vehicle, 
+                "NAV" = "NAV", 
+                "TeryxH2" = "5525"
+                )
+  
+  search <- search |> 
     janitor::clean_names() |>
     dplyr::mutate(
       date = as.Date(date),
       advertiser = "KAWASAKI MOTORS CORP",
-      campaign = "FY25_Kawasaki_NAV_Sustain_Campaign",
+      campaign = glue::glue("FY25_Kawasaki_{veh}_Sustain_Campaign"),
       partner = "google",
       type = "Search",
       placement_type = NA
@@ -32,7 +45,7 @@ merge_search <- function(data) {
     )
 
   # MERGE CLEAN NEXTDOOR WITH CM360 ---------------------------------------------
-  search_dates_in_dat <- search_sustain |>
+  search_dates_in_dat <- search |>
     # filter(partner == "nextdoor") |>
     dplyr::pull(date)
 
@@ -41,7 +54,7 @@ merge_search <- function(data) {
     dplyr::filter(
       !(partner == "google" & type == "Search" & date %in% search_dates_in_dat)
     ) |>
-    dplyr::bind_rows(search_sustain |> dplyr::filter(date %in% search_dates_in_dat)) |>
+    dplyr::bind_rows(search |> dplyr::filter(date %in% search_dates_in_dat)) |>
     dplyr::arrange(partner, type, date)
   return(tmpdat)
 }
