@@ -156,14 +156,15 @@ gmail_update_cf <- function(vehicle) {
     # META TERYXH2
     daily_meta_teryx <- tryCatch(
       {
-        readxl::read_excel(tmp_file, skip = 3, sheet = "Kawasaki 5525 - META") |>
+        readxl::read_excel(tmp_file, skip = 3, sheet = "Kawasaki 5525 - META", col_types = "text") |>
           janitor::clean_names() |>
+          dplyr::filter(!is.na(day)) |> 
           dplyr::mutate(
             `Reporting starts` = as.Date(as.numeric(day), origin = "1899-12-30"),
             Creative = creative_name,
             `Campaign name` = campaign_name,
             `Ad Set Name` = NA,
-            leads = as.numeric(leads)
+            dplyr::across(media_cost:leads, ~as.numeric(.))
             ) |> 
           dplyr::filter(`Reporting starts` == Sys.Date() - 1) |>
           dplyr::group_by(
@@ -194,13 +195,15 @@ gmail_update_cf <- function(vehicle) {
     # YOUTUBE TERYX
     daily_youtube_teryx <- tryCatch(
       {
-        readxl::read_excel(tmp_file, skip = 3, sheet = "Kawasaki 5525 - YT") |>
+        readxl::read_excel(tmp_file, skip = 3, sheet = "Kawasaki 5525 - YT", col_types = "text") |>
           janitor::clean_names() |>
+          dplyr::filter(!is.na(day)) |> 
           dplyr::mutate(
             `Reporting starts` = as.Date(as.numeric(day), origin = "1899-12-30"),
             Creative = creative,
             `Campaign name` = campaign,
-            `Ad Set Name` = placement
+            `Ad Set Name` = placement,
+            dplyr::across(media_spend:video_avg_duration_seconds, ~as.numeric(.))
           ) |> 
           dplyr::filter(`Reporting starts` == Sys.Date() - 1) |>
           dplyr::group_by(
@@ -219,14 +222,46 @@ gmail_update_cf <- function(vehicle) {
           )
       },
       error = function(e) {
-        stop("Failed to read daily meta file: ", e$message)
+        stop("Failed to read daily youtube file: ", e$message)
       }
     )
     # GOOGLE SHEETS  ----------------------------------------------------------
-    if (nrow(daily_meta_teryx) > 0) {
+    if (nrow(daily_youtube_teryx) > 0) {
       googlesheets4::sheet_append(ss = meta_id, daily_youtube_teryx, sheet = "youtube")
     }
+  
+  # SEARCH TERYX
+  daily_search_teryx <- tryCatch(
+    {
+      readxl::read_excel(tmp_file, skip = 3, sheet = "Kawasaki 5525 - GS", col_types = "text") |>
+        janitor::clean_names() |> 
+        dplyr::filter(day != "Totals") |> 
+        dplyr::mutate(
+          `Date` = as.Date(as.numeric(day), origin = "1899-12-30"),
+          Campaign = campaign,
+          dplyr::across(media_spend:clicks, ~as.numeric(.))
+        ) |> 
+        # dplyr::filter(Date == Sys.Date() - 1) |>
+        dplyr::group_by(
+          Date,
+          Campaign
+        ) |>
+        dplyr::summarise(
+          `Amount spent (USD)` = sum(media_spend, na.rm = TRUE),
+          Impressions = sum(impressions, na.rm = TRUE),
+          Clicks = sum(clicks, na.rm = TRUE)
+        )
+    },
+    error = function(e) {
+      stop("Failed to read daily search file: ", e$message)
+    }
+  )
+  # GOOGLE SHEETS  ----------------------------------------------------------
+  if (nrow(daily_search_teryx) > 0) {
+    googlesheets4::sheet_append(ss = meta_id, daily_search_teryx, sheet = "search")
   }
+  }
+  
   # TeryxH2 runs after NAV, so we'll only mark as read for Teryx
   if (vehicle == "TeryxH2") {
     # Mark the message as read
