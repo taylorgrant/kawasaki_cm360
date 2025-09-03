@@ -196,8 +196,8 @@ gmail_update_cf <- function(vehicle) {
     daily_youtube_teryx <- tryCatch(
       {
         readxl::read_excel(tmp_file, skip = 3, sheet = "Kawasaki 5525 - YT", col_types = "text") |>
-          janitor::clean_names() |>
-          dplyr::filter(!is.na(day)) |> 
+          janitor::clean_names() |> 
+          dplyr::filter(day != "Totals") |> 
           dplyr::mutate(
             `Reporting starts` = as.Date(as.numeric(day), origin = "1899-12-30"),
             Creative = creative,
@@ -247,7 +247,7 @@ gmail_update_cf <- function(vehicle) {
           Campaign
         ) |>
         dplyr::summarise(
-          `Amount spent (USD)` = sum(media_spend, na.rm = TRUE),
+          Spend = sum(media_spend, na.rm = TRUE),
           Impressions = sum(impressions, na.rm = TRUE),
           Clicks = sum(clicks, na.rm = TRUE)
         )
