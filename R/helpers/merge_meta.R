@@ -54,7 +54,7 @@ merge_meta <- function(vehicle, data) {
       video_completes = sum(video_completions)
     )
 
-  # 2. Get Meta Performance Data (for Sustain campaign)
+  # 2. Get Meta Performance Data
   numeric_cols <- c(
     "amount_spent_usd",
     "impressions",
@@ -65,7 +65,7 @@ merge_meta <- function(vehicle, data) {
     "leads"
   )
 
-  # Your existing column-fixing function (unchanged)
+  # Column-fixing function
   fix_numeric_list_columns <- function(df) {
     for (col in names(df)) {
       col_data <- df[[col]]
@@ -122,6 +122,7 @@ merge_meta <- function(vehicle, data) {
       clicks = sum(link_clicks, na.rm = TRUE),
       video_plays = sum(video_plays, na.rm = TRUE),
       video_completes = sum(video_plays_at_100_percent, na.rm = TRUE),
+      leads = sum(leads, na.rm = TRUE),
       .groups = "drop"
     ) |>
     dplyr::mutate(
