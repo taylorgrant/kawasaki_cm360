@@ -241,7 +241,7 @@ gmail_update_cf <- function(vehicle) {
           Campaign = campaign,
           dplyr::across(media_spend:clicks, ~as.numeric(.))
         ) |> 
-        # dplyr::filter(Date == Sys.Date() - 1) |>
+        dplyr::filter(Date == Sys.Date() - 1) |>
         dplyr::group_by(
           Date,
           Campaign
