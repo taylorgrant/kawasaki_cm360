@@ -1,18 +1,18 @@
 # Update daily sales via Kawi email #
 
 gmail_update_sales <- function(vehicle) {
-  # pacman::p_load(
-  #   tidyverse,
-  #   janitor,
-  #   here,
-  #   glue,
-  #   googlesheets4,
-  #   gmailr,
-  #   base64enc,
-  #   lubridate,
-  #   googlesheets4,
-  #   googledrive
-  # )
+  pacman::p_load(
+    tidyverse,
+    janitor,
+    here,
+    glue,
+    googlesheets4,
+    gmailr,
+    base64enc,
+    lubridate,
+    googlesheets4,
+    googledrive
+  )
 
   options(
     gargle_oauth_cache = "/home/rstudio/R/kawasaki_cm360/.secrets",
