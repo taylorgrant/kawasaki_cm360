@@ -128,6 +128,10 @@ gmail_update_sales <- function(vehicle) {
     }
   )
 
+  # check to make sure the data isn't empty
+  if (nrow(daily) == 0) {
+    stop("Daily sales update is empty")
+  }
   # GOOGLE SHEETS  ----------------------------------------------------------
   # Read in current data
   df <- tryCatch(
